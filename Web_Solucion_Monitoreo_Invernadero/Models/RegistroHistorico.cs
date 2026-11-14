@@ -1,21 +1,37 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Web_Solucion_Monitoreo_Invernadero.Models;
-
-public partial class RegistroHistorico
+namespace Web_Solucion_Monitoreo_Invernadero.Models
 {
-    public int IdRegistro { get; set; }
+    [Table("registro_historico")]
+    public class RegistroHistorico
+    {
+        [Key]
+        [Column("id_registro")]
+        public int IdRegistro { get; set; }
 
-    public int IdInvernadero { get; set; }
+        [Required]
+        [Column("id_invernadero")]
+        public int IdInvernadero { get; set; }
 
-    public decimal Humedad { get; set; }
+        [Required]
+        [Column("humedad", TypeName = "decimal(5,2)")]
+        public decimal Humedad { get; set; }
 
-    public decimal Temperatura { get; set; }
+        [Required]
+        [Column("temperatura", TypeName = "decimal(5,2)")]
+        public decimal Temperatura { get; set; }
 
-    public DateTime FechaHora { get; set; }
+        [Required]
+        [Column("fecha_hora")]
+        public DateTime FechaHora { get; set; } = DateTime.Now;
 
-    public bool? State { get; set; }
+        [Column("state")]
+        public bool State { get; set; } = true;
 
-    public virtual Invernadero IdInvernaderoNavigation { get; set; } = null!;
+        // Llave Foránea
+        [ForeignKey(nameof(IdInvernadero))]
+        public virtual Invernadero? Invernadero { get; set; }
+    }
 }

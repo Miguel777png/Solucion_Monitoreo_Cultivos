@@ -1,19 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Web_Solucion_Monitoreo_Invernadero.Models;
-
-public partial class Usuario
+namespace Web_Solucion_Monitoreo_Invernadero.Models
 {
-    public int IdUsuario { get; set; }
+    [Table("usuarios")]
+    public class Usuario
+    {
+        [Key]
+        [Column("id_usuario")]
+        public int IdUsuario { get; set; }
 
-    public string Nombre { get; set; } = null!;
+        [Required(ErrorMessage = "El nombre es obligatorio")]
+        [StringLength(100)]
+        [Column("nombre")]
+        public string Nombre { get; set; } = string.Empty;
 
-    public string Email { get; set; } = null!;
+        [Required(ErrorMessage = "El correo electrónico es obligatorio")]
+        [EmailAddress]
+        [StringLength(120)]
+        [Column("email")]
+        public string Email { get; set; } = string.Empty;
 
-    public string PasswordHash { get; set; } = null!;
+        [Required]
+        [StringLength(255)]
+        [Column("password_hash")]
+        public string PasswordHash { get; set; } = string.Empty;
 
-    public bool? State { get; set; }
+        [Column("state")]
+        public bool State { get; set; } = true;
 
-    public virtual ICollection<Invernadero> Invernaderos { get; set; } = new List<Invernadero>();
+     
+        public virtual ICollection<Invernadero> Invernaderos { get; set; } = new List<Invernadero>();
+    }
 }
