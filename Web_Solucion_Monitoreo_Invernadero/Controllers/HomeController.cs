@@ -1,32 +1,38 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Diagnostics;
-using Web_Solucion_Monitoreo_Invernadero.Models;
+using Microsoft.EntityFrameworkCore;
+using Web_Solucion_Monitoreo_Invernadero.Database;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly ILogger<HomeController> _logger;
+        private readonly ApplicationDbContext _db;
 
-        public HomeController(ILogger<HomeController> logger)
+        public HomeController(ApplicationDbContext db)
         {
-            _logger = logger;
+            _db = db;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index(int idInvernadero = 1)
         {
-            return View();
-        }
+            var invernadero = await _db.Invernaderos
+                .Include(i => i.Planta)
+                .Include(i => i.Sensores)
+                .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero && i.State);
 
-        public IActionResult Privacy()
-        {
-            return View();
-        }
+            var ultimasAlertas = await _db.BitacoraRiegoAlertas
+                .Where(b => b.IdInvernadero == idInvernadero)
+                .OrderByDescending(b => b.FechaHora)
+                .Take(5)
+                .ToListAsync();
 
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            ViewBag.Alertas = ultimasAlertas;
+            ViewBag.ListaInvernaderos = await _db.Invernaderos
+                .Include(i => i.Planta)
+                .Where(i => i.State)
+                .ToListAsync();
+
+            return View(invernadero);
         }
     }
 }

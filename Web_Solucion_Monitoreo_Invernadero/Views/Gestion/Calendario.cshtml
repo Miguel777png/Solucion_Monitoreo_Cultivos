@@ -1,0 +1,115 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.CalendarioRiego>
+@{
+    ViewData["Title"] = "Calendario de Riego";
+    var plantas = ViewBag.Plantas as List<Web_Solucion_Monitoreo_Invernadero.Models.Planta> ?? new();
+}
+
+<div class="container py-3">
+    <h2 class="fw-bold text-success mb-3">Calendario de Riego Inteligente</h2>
+
+    @if (TempData["MensajeExito"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["MensajeExito"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Nuevo Horario de Riego</div>
+                <div class="card-body">
+                    <form asp-action="CrearHorario" method="post">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Planta / Invernadero</label>
+                            <select name="idPlanta" class="form-select" required>
+                                @foreach (var p in plantas)
+                                {
+                                    <option value="@p.IdPlanta">@p.Nombre (Inv #@p.Invernadero?.IdInvernadero)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Día de la Semana (Recurrente)</label>
+                            <select name="diaSemana" class="form-select">
+                                <option value="Lunes">Lunes</option>
+                                <option value="Martes">Martes</option>
+                                <option value="Miercoles">Miércoles</option>
+                                <option value="Jueves">Jueves</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Sabado">Sábado</option>
+                                <option value="Domingo" selected>Domingo</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">O Fecha Específica (Opcional)</label>
+                            <input type="date" name="fechaEspecifica" class="form-control" />
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Hora Exacta</label>
+                            <input type="time" name="horaRiego" class="form-control" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Duración Riego (segundos)</label>
+                            <input type="number" min="2" max="60" name="tiempoRiegoSeg" value="10" class="form-control" required />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">Programar Riego</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Horarios Activos Evaluados por BackgroundService</div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Planta</th>
+                                <th>Frecuencia</th>
+                                <th>Hora</th>
+                                <th>Duración</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var h in Model)
+                            {
+                                <tr>
+                                    <td>@h.Planta?.Nombre</td>
+                                    <td>@(h.FechaEspecifica.HasValue ? h.FechaEspecifica.Value.ToString("dd/MM/yyyy") : h.DiaSemana)</td>
+                                    <td class="fw-bold">@h.HoraRiego.ToString("HH:mm")</td>
+                                    <td>@h.TiempoRiegoSeg s</td>
+                                    <td>
+                                        @if (h.PospuestoHasta.HasValue)
+                                        {
+                                            <span class="badge bg-warning text-dark">Pospuesto (Humedad óptima)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Activo</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <form asp-action="EliminarHorario" method="post" class="d-inline">
+                                            <input type="hidden" name="idCalendario" value="@h.IdCalendarioRiego" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

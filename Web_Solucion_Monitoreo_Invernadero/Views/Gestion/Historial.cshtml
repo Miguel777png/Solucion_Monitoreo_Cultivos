@@ -1,0 +1,50 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.RegistroHistorico>
+@{
+    ViewData["Title"] = "Historial Ambiental";
+    var invernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    int seleccionado = ViewBag.InvernaderoSeleccionado ?? 1;
+}
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold text-success mb-0">Registro Histórico Guardado (MySQL)</h2>
+        <select class="form-select w-auto" onchange="location.href='/Gestion/Historial?idInvernadero=' + this.value">
+            @foreach (var inv in invernaderos)
+            {
+                <option value="@inv.IdInvernadero" selected="@(inv.IdInvernadero == seleccionado)">
+                    Invernadero #@inv.IdInvernadero (@inv.Ubicacion)
+                </option>
+            }
+        </select>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Humedad (%)</th>
+                        <th>Temperatura (°C)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">Aún no hay registros históricos guardados en este intervalo.</td>
+                        </tr>
+                    }
+                    @foreach (var r in Model)
+                    {
+                        <tr>
+                            <td>@r.FechaHora.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="text-primary fw-bold">@r.Humedad %</td>
+                            <td class="text-danger fw-bold">@r.Temperatura °C</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

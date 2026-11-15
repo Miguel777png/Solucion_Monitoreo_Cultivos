@@ -13,6 +13,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 35))));
 
 builder.Services.AddSingleton<EstadoInvernaderoService>();
+builder.Services.AddHostedService<RiegoProgramadoWorker>();
 
 var app = builder.Build();
 

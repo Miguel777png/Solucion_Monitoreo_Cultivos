@@ -126,16 +126,27 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 await _db.SaveChangesAsync();
             }
 
-            // Respondemos al ESP32 indicando si debe encender el módulo Relé
+            // Calculamos el tiempo de encendido: 5s si fue por emergencia o los segundos configurados en el calendario
+            int segundosAEncender = activarRegadera ? 5 : 0;
+
+            if (estadoRam.RiegoProgramadoPendiente)
+            {
+                activarRegadera = true;
+                segundosAEncender = estadoRam.SegundosRiegoProgramado;
+                estadoRam.RiegoProgramadoPendiente = false; // Limpiamos la orden una vez entregada al ESP32
+            }
+
+            // Respondemos al ESP32 indicando si debe encender el módulo Relé y por cuántos segundos
             return Ok(new
             {
                 activarRegadera = activarRegadera,
-                tiempoSeg = activarRegadera ? 5 : 0
+                tiempoSeg = segundosAEncender
             });
         }
 
         // 2. ENDPOINT PARA EL DASHBOARD WEB (Chart.js): GET /api/telemetria/actual/1
         [HttpGet("actual/{idInvernadero:int}")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public IActionResult ObtenerEnVivo(int idInvernadero)
         {
             var estado = _ram.ObtenerOCrear(idInvernadero);

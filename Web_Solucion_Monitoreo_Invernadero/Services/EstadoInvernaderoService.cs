@@ -11,7 +11,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         public decimal Temperatura { get; set; }
     }
 
-    // Representa el estado individual en RAM de UN solo invernadero
     public class EstadoInvernadero
     {
         private readonly object _lock = new();
@@ -20,13 +19,16 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         public decimal UltimaHumedad { get; private set; }
         public decimal UltimaTemperatura { get; private set; }
         public DateTime UltimaActualizacion { get; private set; } = DateTime.MinValue;
-        public bool SensorConectado => (DateTime.Now - UltimaActualizacion).TotalSeconds <= 15;
+        public bool SensorConectado => (DateTime.Now - UltimaActualizacion).TotalSeconds <= 25;
 
-        // Relojes independientes por invernadero
         public DateTime UltimoGuardadoHistorico { get; set; } = DateTime.MinValue;
         public DateTime UltimaAlertaCritica { get; set; } = DateTime.MinValue;
 
-        // Caché de umbrales propios de la planta de este invernadero
+        // Control de riego programado desde BackgroundService
+        public bool RiegoProgramadoPendiente { get; set; } = false;
+        public int SegundosRiegoProgramado { get; set; } = 15;
+        public string UltimoMinutoEvaluadoCalendario { get; set; } = string.Empty;
+
         public int FrecuenciaRegistroMin { get; set; } = 60;
         public decimal TemperaturaMaxima { get; set; } = 24.00m;
         public decimal TemperaturaMinima { get; set; } = 18.00m;
@@ -51,7 +53,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                     Temperatura = temperatura
                 });
 
-                while (_ultimosPuntos.Count > 20)
+                // Ampliamos a 40 puntos para que el desplazamiento continuo en Chart.js se note fluido
+                while (_ultimosPuntos.Count > 40)
                 {
                     _ultimosPuntos.Dequeue();
                 }
@@ -67,13 +70,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         }
     }
 
-    // Servicio Singleton global que administra todos los invernaderos en RAM
     public class EstadoInvernaderoService
     {
-        // Diccionario seguro para hilos múltiples: Key = id_invernadero (1, 2, 3...)
         private readonly ConcurrentDictionary<int, EstadoInvernadero> _estados = new();
 
-        // Obtiene el estado de un invernadero específico; si no existe aún en RAM, lo crea al instante
         public EstadoInvernadero ObtenerOCrear(int idInvernadero)
         {
             return _estados.GetOrAdd(idInvernadero, id => new EstadoInvernadero
@@ -82,7 +82,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             });
         }
 
-        // Permite consultar todos los invernaderos activos a la vez (útil para el panel general)
         public IEnumerable<EstadoInvernadero> ObtenerTodos() => _estados.Values;
     }
 }
