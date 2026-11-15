@@ -1,27 +1,48 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Web_Solucion_Monitoreo_Invernadero.Models;
-
-public partial class BitacoraRiegoAlerta
+namespace Web_Solucion_Monitoreo_Invernadero.Models
 {
-    public int IdEvento { get; set; }
+    [Table("bitacora_riego_alertas")]
+    public class BitacoraRiegoAlerta
+    {
+        [Key]
+        [Column("id_evento")]
+        public int IdEvento { get; set; }
 
-    public int IdInvernadero { get; set; }
+        [Required]
+        [Column("id_invernadero")]
+        public int IdInvernadero { get; set; }
 
-    public string TipoEvento { get; set; } = null!;
+        [Required]
+        [StringLength(30)]
+        [Column("tipo_evento")]
+        public string TipoEvento { get; set; } = string.Empty;
 
-    public string Descripcion { get; set; } = null!;
+        [Required]
+        [StringLength(255)]
+        [Column("descripcion")]
+        public string Descripcion { get; set; } = string.Empty;
 
-    public int? TiempoActivacionSeg { get; set; }
+        [Column("tiempo_activacion_seg")]
+        public int? TiempoActivacionSeg { get; set; }
 
-    public decimal? HumedadMomento { get; set; }
+        [Column("humedad_momento", TypeName = "decimal(5,2)")]
+        public decimal? HumedadMomento { get; set; }
 
-    public decimal? TemperaturaMomento { get; set; }
+        [Column("temperatura_momento", TypeName = "decimal(5,2)")]
+        public decimal? TemperaturaMomento { get; set; }
 
-    public DateTime FechaHora { get; set; }
+        [Required]
+        [Column("fecha_hora")]
+        public DateTime FechaHora { get; set; } = DateTime.Now;
 
-    public bool Leida { get; set; }
+        [Column("leida")]
+        public bool Leida { get; set; } = false;
 
-    public virtual Invernadero IdInvernaderoNavigation { get; set; } = null!;
+        // Llave Foránea
+        [ForeignKey(nameof(IdInvernadero))]
+        public virtual Invernadero? Invernadero { get; set; }
+    }
 }

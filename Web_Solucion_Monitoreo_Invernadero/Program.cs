@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
+using Web_Solucion_Monitoreo_Invernadero.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 35))));
 
-
+builder.Services.AddSingleton<EstadoInvernaderoService>();
 
 var app = builder.Build();
 
@@ -26,6 +27,7 @@ app.UseRouting();
 
 app.UseAuthorization();
 
+app.MapControllers();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
