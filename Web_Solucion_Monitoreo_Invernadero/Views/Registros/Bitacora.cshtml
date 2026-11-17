@@ -1,0 +1,78 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.BitacoraRiegoAlerta>
+@{
+    ViewData["Title"] = "Bitácora de Riegos y Alertas";
+    var invernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    int? invSel = ViewBag.IdInvernadero;
+}
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="fw-bold text-success mb-0">Bitácora Automática de Riegos y Alertas</h2>
+            <small class="text-muted">Eventos ejecutados por umbrales críticos y calendario inteligente.</small>
+        </div>
+        <a asp-action="Historial" class="btn btn-outline-secondary btn-sm">Volver a Historial Ambiental</a>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="d-flex align-items-center gap-2">
+                <label class="small fw-bold text-nowrap mb-0">Invernadero:</label>
+                <select name="idInvernadero" class="form-select form-select-sm" style="max-width: 300px;">
+                    <option value="">Todos los invernaderos (3)</option>
+                    @foreach (var inv in invernaderos)
+                    {
+                        <option value="@inv.IdInvernadero" selected="@(invSel == inv.IdInvernadero)">
+                            @inv.Nombre
+                        </option>
+                    }
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Invernadero</th>
+                        <th>Tipo Evento</th>
+                        <th>Detalle</th>
+                        <th>Lectura Momento</th>
+                        <th>Riego (seg)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">Sin eventos registrados.</td>
+                        </tr>
+                    }
+                    @foreach (var b in Model)
+                    {
+                        string badgeClass = b.TipoEvento switch
+                        {
+                            "RIEGO_EMERGENCIA" => "bg-danger",
+                            "RIEGO_PROGRAMADO" => "bg-primary",
+                            "RIEGO_POSPUESTO" => "bg-warning text-dark",
+                            _ => "bg-secondary"
+                        };
+
+                        <tr>
+                            <td class="text-nowrap">@b.FechaHora.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="fw-semibold">@b.Invernadero?.Nombre</td>
+                            <td><span class="badge @badgeClass">@b.TipoEvento</span></td>
+                            <td class="small">@b.Descripcion</td>
+                            <td class="small text-nowrap">H: @b.HumedadMomento% | T: @b.TemperaturaMomento°C</td>
+                            <td class="fw-bold">@(b.TiempoActivacionSeg > 0 ? $"{b.TiempoActivacionSeg}s" : "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

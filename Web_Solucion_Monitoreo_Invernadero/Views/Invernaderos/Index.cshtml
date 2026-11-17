@@ -1,0 +1,89 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero>
+@{
+    ViewData["Title"] = "Gestión de Invernaderos";
+    var todasPlantas = ViewBag.TodasPlantas as List<Web_Solucion_Monitoreo_Invernadero.Models.Planta> ?? new();
+}
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="fw-bold text-success mb-0">Configuración de los 3 Invernaderos</h2>
+            <small class="text-muted">Cada invernadero tiene su ESP32 dedicado y una única especie asignada (1:1).</small>
+        </div>
+        <a asp-controller="Plantas" asp-action="Index" class="btn btn-outline-success btn-sm">+ Ingresar Nueva Planta al Catálogo</a>
+    </div>
+
+    @if (TempData["MensajeExito"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["MensajeExito"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["MensajeError"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["MensajeError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        @foreach (var inv in Model)
+        {
+            var sensor = inv.Sensores.FirstOrDefault();
+            // Solo plantas libres (Invernadero == null) o la que ya pertenece a este invernadero
+            var plantasDisponibles = todasPlantas
+                .Where(p => p.Invernadero == null || p.Invernadero.IdInvernadero == inv.IdInvernadero)
+                .ToList();
+
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100 border-top border-4 border-success">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Invernadero #@inv.IdInvernadero</span>
+                        <span class="badge bg-dark">@(sensor?.CodigoDispositivo ?? "Sin ESP32")</span>
+                    </div>
+                    <div class="card-body">
+                        <form asp-action="ActualizarAsignacion" method="post">
+                            <input type="hidden" name="idInvernadero" value="@inv.IdInvernadero" />
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">Nombre del Sector</label>
+                                <input type="text" name="nombre" class="form-control form-control-sm" value="@inv.Nombre" required />
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">Ubicación Física</label>
+                                <input type="text" name="ubicacion" class="form-control form-control-sm" value="@inv.Ubicacion" required />
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold text-success">Planta Única Asignada (1:1)</label>
+                                <select name="idPlanta" class="form-select form-select-sm border-success" required>
+                                    @foreach (var p in plantasDisponibles)
+                                    {
+                                        <option value="@p.IdPlanta" selected="@(p.IdPlanta == inv.IdPlanta)">
+                                            @p.Nombre (@p.TemperaturaMinima-@p.TemperaturaMaxima°C | @p.HumedadMinima-@p.HumedadMaxima%)
+                                        </option>
+                                    }
+                                </select>
+                                <div class="form-text small">Solo muestra plantas disponibles en catálogo.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Guardado Histórico BD (min)</label>
+                                <input type="number" min="1" max="1440" name="frecuenciaRegistroMin" class="form-control form-control-sm" value="@inv.FrecuenciaRegistroMin" required />
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-sm w-100 fw-bold">Aplicar Configuración</button>
+                        </form>
+                    </div>
+                    <div class="card-footer bg-light small text-muted">
+                        Último cambio: <strong>Usuario ID #@inv.IdUsuarioModificacion</strong> (@inv.UsuarioModificacion?.Nombre)<br />
+                        Fecha: @inv.FechaModificacion.ToString("dd/MM/yyyy HH:mm")
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>

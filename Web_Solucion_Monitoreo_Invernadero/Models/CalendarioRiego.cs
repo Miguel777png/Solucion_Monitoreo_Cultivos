@@ -12,13 +12,17 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         public int IdCalendarioRiego { get; set; }
 
         [Required]
-        [Column("id_planta")]
-        public int IdPlanta { get; set; }
+        [Column("id_invernadero")]
+        public int IdInvernadero { get; set; }
+
+        [Required]
+        [Column("id_usuario")]
+        public int IdUsuario { get; set; }
 
         [Column("fecha_especifica", TypeName = "date")]
         public DateOnly? FechaEspecifica { get; set; }
 
-        [StringLength(15)]
+        [StringLength(20)]
         [Column("dia_semana")]
         public string? DiaSemana { get; set; }
 
@@ -29,16 +33,21 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         [Required]
         [Range(1, 3600, ErrorMessage = "El tiempo de riego debe ser al menos 1 segundo")]
         [Column("tiempo_riego_seg")]
-        public int TiempoRiegoSeg { get; set; } = 15;
+        public int TiempoRiegoSeg { get; set; } = 10;
 
         [Column("pospuesto_hasta", TypeName = "date")]
         public DateOnly? PospuestoHasta { get; set; }
 
+        [Column("fecha_creacion")]
+        public DateTime FechaCreacion { get; set; } = DateTime.Now;
+
         [Column("state")]
         public bool State { get; set; } = true;
 
-        // Llave Foránea
-        [ForeignKey(nameof(IdPlanta))]
-        public virtual Planta? Planta { get; set; }
+        [ForeignKey(nameof(IdInvernadero))]
+        public virtual Invernadero? Invernadero { get; set; }
+
+        [ForeignKey(nameof(IdUsuario))]
+        public virtual Usuario? Usuario { get; set; }
     }
 }

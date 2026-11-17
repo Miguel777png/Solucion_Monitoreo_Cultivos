@@ -17,7 +17,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Bucle infinito mientras el servidor esté encendido
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
@@ -29,7 +28,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                     Console.WriteLine($"[RiegoProgramadoWorker] Error: {ex.Message}");
                 }
 
-                // Revisa cada 20 segundos para no perder ningún minuto exacto
                 await Task.Delay(TimeSpan.FromSeconds(20), stoppingToken);
             }
         }
@@ -40,25 +38,22 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             string claveMinutoActual = ahora.ToString("yyyy-MM-dd HH:mm");
             string diaSemanaEs = ObtenerDiaSemanaEnEspanol(ahora.DayOfWeek);
 
-            // Como DbContext es Scoped y el Worker es Singleton, creamos un Scope temporal por ciclo
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var horariosActivos = await db.CalendarioRiego
-                .Include(c => c.Planta)
-                    .ThenInclude(p => p!.Invernadero)
-                .Where(c => c.State && c.Planta != null && c.Planta.Invernadero != null && c.Planta.Invernadero.State)
+                .Include(c => c.Invernadero)
+                    .ThenInclude(i => i!.Planta)
+                .Where(c => c.State && c.Invernadero != null && c.Invernadero.State && c.Invernadero.Planta != null)
                 .ToListAsync(ct);
 
             bool huboCambiosBd = false;
 
             foreach (var horario in horariosActivos)
             {
-                // 1. Verificar si coincide la hora y el minuto exacto (TimeOnly en .NET 8)
                 if (horario.HoraRiego.Hour != ahora.Hour || horario.HoraRiego.Minute != ahora.Minute)
                     continue;
 
-                // 2. Verificar si coincide la fecha específica O el día de la semana recurrente
                 bool coincideFecha = horario.FechaEspecifica.HasValue &&
                                      horario.FechaEspecifica.Value == DateOnly.FromDateTime(ahora);
 
@@ -69,18 +64,16 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                 if (!coincideFecha && !coincideDia)
                     continue;
 
-                int idInv = horario.Planta!.Invernadero!.IdInvernadero;
+                int idInv = horario.IdInvernadero;
                 var estadoRam = _ram.ObtenerOCrear(idInv);
 
-                // Evita ejecutar dos veces el mismo horario dentro del mismo minuto
                 if (estadoRam.UltimoMinutoEvaluadoCalendario == claveMinutoActual)
                     continue;
 
                 estadoRam.UltimoMinutoEvaluadoCalendario = claveMinutoActual;
 
-                // 3. Lógica inteligente: si el sensor está en vivo y la humedad ya es óptima, posponemos el riego
                 decimal humedadActual = estadoRam.UltimaHumedad;
-                decimal humedadMinima = horario.Planta.HumedadMinima;
+                decimal humedadMinima = horario.Invernadero!.Planta!.HumedadMinima;
 
                 if (estadoRam.SensorConectado && humedadActual >= humedadMinima)
                 {
@@ -100,7 +93,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                 }
                 else
                 {
-                    // Ordenamos encender la regadera en el próximo pulso del ESP32
                     estadoRam.RiegoProgramadoPendiente = true;
                     estadoRam.SegundosRiegoProgramado = horario.TiempoRiegoSeg;
                     horario.PospuestoHasta = null;
@@ -109,7 +101,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                     {
                         IdInvernadero = idInv,
                         TipoEvento = "RIEGO_PROGRAMADO",
-                        Descripcion = $"Riego programado ejecutado ({ahora:HH:mm}) durante {horario.TiempoRiegoSeg}s.",
+                        Descripcion = $"Riego programado ejecutado ({ahora:HH:mm}) durante {horario.TiempoRiegoSeg}s para {horario.Invernadero.Planta.Nombre}.",
                         TiempoActivacionSeg = horario.TiempoRiegoSeg,
                         HumedadMomento = humedadActual,
                         TemperaturaMomento = estadoRam.UltimaTemperatura,

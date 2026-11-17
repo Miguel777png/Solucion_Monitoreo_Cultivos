@@ -21,12 +21,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         public string CodigoDispositivo { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(20)]
-        [Column("tipo_conexion")]
-        public string TipoConexion { get; set; } = "WiFi";
+        [StringLength(100)]
+        [Column("nombre_nodo")]
+        public string NombreNodo { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(20)]
+        [StringLength(30)]
         [Column("estado_conexion")]
         public string EstadoConexion { get; set; } = "Desconectado";
 
@@ -36,7 +36,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         [Column("state")]
         public bool State { get; set; } = true;
 
-        // Llave Foránea
         [ForeignKey(nameof(IdInvernadero))]
         public virtual Invernadero? Invernadero { get; set; }
     }

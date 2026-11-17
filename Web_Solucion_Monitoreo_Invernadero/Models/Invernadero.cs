@@ -12,13 +12,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         [Column("id_invernadero")]
         public int IdInvernadero { get; set; }
 
-        [Required]
-        [Column("id_usuario")]
-        public int IdUsuario { get; set; }
-
-        [Required]
-        [Column("id_planta")]
-        public int IdPlanta { get; set; }
+        [Required(ErrorMessage = "El nombre del invernadero es obligatorio")]
+        [StringLength(100)]
+        [Column("nombre")]
+        public string Nombre { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "La ubicación es obligatoria")]
         [StringLength(150)]
@@ -26,22 +23,32 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         public string Ubicacion { get; set; } = string.Empty;
 
         [Required]
+        [Column("id_planta")]
+        public int IdPlanta { get; set; }
+
+        [Required]
         [Range(1, 1440, ErrorMessage = "La frecuencia debe estar entre 1 y 1440 minutos")]
         [Column("frecuencia_registro_min")]
         public int FrecuenciaRegistroMin { get; set; } = 60;
 
+        [Required]
+        [Column("id_usuario_modificacion")]
+        public int IdUsuarioModificacion { get; set; }
+
+        [Column("fecha_modificacion")]
+        public DateTime FechaModificacion { get; set; } = DateTime.Now;
+
         [Column("state")]
         public bool State { get; set; } = true;
-
-        // Llaves Foráneas
-        [ForeignKey(nameof(IdUsuario))]
-        public virtual Usuario? Usuario { get; set; }
 
         [ForeignKey(nameof(IdPlanta))]
         public virtual Planta? Planta { get; set; }
 
-        // Relaciones 1:N hijas
+        [ForeignKey(nameof(IdUsuarioModificacion))]
+        public virtual Usuario? UsuarioModificacion { get; set; }
+
         public virtual ICollection<Sensor> Sensores { get; set; } = new List<Sensor>();
+        public virtual ICollection<CalendarioRiego> CalendariosRiego { get; set; } = new List<CalendarioRiego>();
         public virtual ICollection<RegistroHistorico> RegistrosHistoricos { get; set; } = new List<RegistroHistorico>();
         public virtual ICollection<BitacoraRiegoAlerta> BitacoraEventos { get; set; } = new List<BitacoraRiegoAlerta>();
     }

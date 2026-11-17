@@ -7,7 +7,7 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")] // Ruta base: /api/telemetria
+    [Route("api/[controller]")]
     public class TelemetriaController : ControllerBase
     {
         private readonly ApplicationDbContext _db;
@@ -19,11 +19,35 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             _ram = ram;
         }
 
-        // 1. ENDPOINT PARA EL ESP32: POST /api/telemetria
+
+
+        // 4. ENDPOINT DE ALERTAS EN VIVO PARA EL PANEL DERECHO DEL DASHBOARD
+        [HttpGet("alertas/{idInvernadero:int}")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> ObtenerAlertasRecientes(int idInvernadero)
+        {
+            var alertas = await _db.BitacoraRiegoAlertas
+                .Where(b => b.IdInvernadero == idInvernadero)
+                .OrderByDescending(b => b.FechaHora)
+                .Take(8)
+                .Select(b => new
+                {
+                    tipoEvento = b.TipoEvento,
+                    descripcion = b.Descripcion,
+                    fechaHora = b.FechaHora.ToString("dd/MM HH:mm:ss")
+                })
+                .ToListAsync();
+
+            return Ok(alertas);
+        }
+
+
+
+        // 1. ENDPOINT PARA LOS 3 ESP32: POST /api/telemetria
         [HttpPost]
         public async Task<IActionResult> RecibirLectura([FromBody] LecturaSensorDto datos)
         {
-            // Buscamos a qué invernadero pertenece el código del ESP32 (ej. "ESP32-ORQ-01")
+            // Filtra por lista blanca: solo entran ESP32-ORQ-01, ESP32-ORQ-02 o ESP32-ORQ-03 activos
             var sensor = await _db.Sensores
                 .Include(s => s.Invernadero)
                     .ThenInclude(i => i!.Planta)
@@ -38,7 +62,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             var estadoRam = _ram.ObtenerOCrear(idInv);
             var planta = sensor.Invernadero.Planta;
 
-            // Sincronizamos los umbrales y frecuencia en RAM por si fueron editados desde la web
+            // Sincroniza en RAM los umbrales de la planta única asignada a este invernadero
             estadoRam.FrecuenciaRegistroMin = sensor.Invernadero.FrecuenciaRegistroMin;
             estadoRam.TemperaturaMaxima = planta.TemperaturaMaxima;
             estadoRam.TemperaturaMinima = planta.TemperaturaMinima;
@@ -48,7 +72,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             bool huboCambiosBd = false;
 
-            // Si el sensor estaba marcado como Desconectado en BD, lo pasamos a Conectado
             if (sensor.EstadoConexion != "Conectado")
             {
                 sensor.EstadoConexion = "Conectado";
@@ -56,17 +79,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             }
             sensor.UltimaSenal = DateTime.Now;
 
-            // Guardamos la lectura en la memoria RAM del invernadero correspondiente (cero carga a MySQL)
             estadoRam.RegistrarLectura(datos.Humedad, datos.Temperatura);
 
-            // Evaluación de las 4 reglas de umbrales de la planta
+            // Evaluación de las 4 reglas según la planta del invernadero
             bool necesitaRiegoEmergencia = datos.Humedad < estadoRam.HumedadMinima || datos.Temperatura > estadoRam.TemperaturaMaxima;
             bool alertaSinRiego = datos.Humedad > estadoRam.HumedadMaxima || datos.Temperatura < estadoRam.TemperaturaMinima;
             bool activarRegadera = false;
 
             if (necesitaRiegoEmergencia || alertaSinRiego)
             {
-                // Cooldown de 5 minutos para no inundar la bitácora con alertas repetidas
                 if ((DateTime.Now - estadoRam.UltimaAlertaCritica).TotalMinutes >= 5)
                 {
                     estadoRam.UltimaAlertaCritica = DateTime.Now;
@@ -78,7 +99,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                         {
                             IdInvernadero = idInv,
                             TipoEvento = "RIEGO_EMERGENCIA",
-                            Descripcion = $"Umbral crítico (Riego activado): Humedad {datos.Humedad}% / Temp {datos.Temperatura}°C",
+                            Descripcion = $"[{planta.Nombre}] Umbral crítico (Riego activado): Humedad {datos.Humedad}% / Temp {datos.Temperatura}°C",
                             TiempoActivacionSeg = 5,
                             HumedadMomento = datos.Humedad,
                             TemperaturaMomento = datos.Temperatura,
@@ -92,7 +113,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                         {
                             IdInvernadero = idInv,
                             TipoEvento = "ALERTA_UMBRAL",
-                            Descripcion = $"Fuera de rango óptimo (Sin riego): Humedad {datos.Humedad}% / Temp {datos.Temperatura}°C",
+                            Descripcion = $"[{planta.Nombre}] Fuera de rango óptimo (Sin riego): Humedad {datos.Humedad}% / Temp {datos.Temperatura}°C",
                             TiempoActivacionSeg = 0,
                             HumedadMomento = datos.Humedad,
                             TemperaturaMomento = datos.Temperatura,
@@ -105,7 +126,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 }
             }
 
-            // Guardado periódico en REGISTRO_HISTORICO según la frecuencia elegida por el usuario (ej. 60 min)
+            // Guardado histórico periódico en MySQL
             if ((DateTime.Now - estadoRam.UltimoGuardadoHistorico).TotalMinutes >= estadoRam.FrecuenciaRegistroMin)
             {
                 _db.RegistroHistorico.Add(new RegistroHistorico
@@ -126,17 +147,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 await _db.SaveChangesAsync();
             }
 
-            // Calculamos el tiempo de encendido: 5s si fue por emergencia o los segundos configurados en el calendario
             int segundosAEncender = activarRegadera ? 5 : 0;
 
             if (estadoRam.RiegoProgramadoPendiente)
             {
                 activarRegadera = true;
                 segundosAEncender = estadoRam.SegundosRiegoProgramado;
-                estadoRam.RiegoProgramadoPendiente = false; // Limpiamos la orden una vez entregada al ESP32
+                estadoRam.RiegoProgramadoPendiente = false;
             }
 
-            // Respondemos al ESP32 indicando si debe encender el módulo Relé y por cuántos segundos
             return Ok(new
             {
                 activarRegadera = activarRegadera,
@@ -144,7 +163,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             });
         }
 
-        // 2. ENDPOINT PARA EL DASHBOARD WEB (Chart.js): GET /api/telemetria/actual/1
+        // 2. ENDPOINT EN VIVO DE UN INVERNADERO ESPECÍFICO: GET /api/telemetria/actual/1
         [HttpGet("actual/{idInvernadero:int}")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public IActionResult ObtenerEnVivo(int idInvernadero)
@@ -162,6 +181,26 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                     : estado.UltimaActualizacion.ToString("HH:mm:ss"),
                 historialReciente = estado.ObtenerPuntos()
             });
+        }
+
+        // 3. ENDPOINT GLOBAL PARA LAS 3 TARJETAS DEL DASHBOARD: GET /api/telemetria/resumen-todos
+        [HttpGet("resumen-todos")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public IActionResult ObtenerResumenTodos()
+        {
+            var resumen = new[] { 1, 2, 3 }.Select(id =>
+            {
+                var est = _ram.ObtenerOCrear(id);
+                return new
+                {
+                    idInvernadero = id,
+                    conectado = est.SensorConectado,
+                    humedad = est.UltimaHumedad,
+                    temperatura = est.UltimaTemperatura
+                };
+            });
+
+            return Ok(resumen);
         }
     }
 }

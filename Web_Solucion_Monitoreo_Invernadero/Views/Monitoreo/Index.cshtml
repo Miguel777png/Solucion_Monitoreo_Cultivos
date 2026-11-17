@@ -1,0 +1,158 @@
+﻿@model Web_Solucion_Monitoreo_Invernadero.Models.Invernadero
+@{
+    ViewData["Title"] = "Monitor en Vivo - 3 Invernaderos";
+    var todos = ViewBag.TodosInvernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    var alertas = ViewBag.UltimasAlertas as List<Web_Solucion_Monitoreo_Invernadero.Models.BitacoraRiegoAlerta> ?? new();
+    int idActual = Model?.IdInvernadero ?? 1;
+    var sensorActual = Model?.Sensores.FirstOrDefault();
+}
+
+<div class="container py-3">
+    <!-- 1. TARJETAS SUPERIORES DE LOS 3 INVERNADEROS (SELECCIÓN RÁPIDA EN VIVO) -->
+    <div class="row g-3 mb-4">
+        @foreach (var inv in todos)
+        {
+            bool esSeleccionado = inv.IdInvernadero == idActual;
+            var s = inv.Sensores.FirstOrDefault();
+
+            <div class="col-md-4">
+                <a asp-controller="Monitoreo" asp-action="Index" asp-route-idInvernadero="@inv.IdInvernadero"
+                   class="text-decoration-none">
+                    <div class="card shadow-sm h-100 @(esSeleccionado ? "border-success border-3 bg-light" : "border-0")">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark">@inv.Nombre</span>
+                                <span id="mini-badge-@inv.IdInvernadero" class="badge bg-secondary">Esperando...</span>
+                            </div>
+                            <div class="small text-muted mb-2">
+                                Planta: <strong class="text-success">@inv.Planta?.Nombre</strong> · Nodo: <code>@s?.CodigoDispositivo</code>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-primary fw-bold fs-5" id="mini-hum-@inv.IdInvernadero">-- %</span>
+                                <span class="text-danger fw-bold fs-5" id="mini-temp-@inv.IdInvernadero">-- °C</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+
+    <!-- 2. ENCABEZADO DEL INVERNADERO SELECCIONADO -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="fw-bold text-success mb-0">@Model?.Nombre — @Model?.Planta?.Nombre</h2>
+            <small class="text-muted">
+                @Model?.Ubicacion · Dispositivo ESP32: <strong>@sensorActual?.CodigoDispositivo</strong> (@sensorActual?.NombreNodo)
+            </small>
+        </div>
+        <span id="badge-conexion" class="badge bg-secondary fs-6 px-3 py-2">
+            Verificando ESP32...
+        </span>
+    </div>
+
+    <!-- 3. KPIs EN TIEMPO REAL -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-primary shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-uppercase small text-muted fw-bold">Humedad Relativa Actual</div>
+                    <div class="display-5 fw-bold text-primary my-1">
+                        <span id="kpi-humedad">--</span> %
+                    </div>
+                    <span class="badge bg-light text-dark border">
+                        Rango óptimo: @Model?.Planta?.HumedadMinima% - @Model?.Planta?.HumedadMaxima%
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-danger shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-uppercase small text-muted fw-bold">Temperatura Ambiental</div>
+                    <div class="display-5 fw-bold text-danger my-1">
+                        <span id="kpi-temperatura">--</span> °C
+                    </div>
+                    <span class="badge bg-light text-dark border">
+                        Rango óptimo: @Model?.Planta?.TemperaturaMinima°C - @Model?.Planta?.TemperaturaMaxima°C
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-success shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-uppercase small text-muted fw-bold">Última Transmisión ESP32</div>
+                    <div class="h2 fw-bold text-dark my-2" id="kpi-hora">Sin datos</div>
+                    <span class="badge bg-light text-dark border">
+                        Guardado BD: cada @Model?.FrecuenciaRegistroMin min
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. GRÁFICO CHART.JS Y ÚLTIMAS ALERTAS -->
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>Curva Ambiental en Tiempo Real (Memoria RAM)</span>
+                    <span class="badge bg-dark" id="reloj-actual">--:--:--</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficaTelemetria" height="125"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>Eventos de este Invernadero</span>
+                    <a asp-controller="Registros" asp-action="Bitacora" asp-route-idInvernadero="@idActual" class="small">Ver todos</a>
+                </div>
+                <div class="card-body p-0">
+                    <ul id="lista-alertas-vivo" class="list-group list-group-flush">
+                        @if (!alertas.Any())
+                        {
+                            <li class="list-group-item text-muted small py-3">
+                                Sin alertas ni riegos recientes en este invernadero.
+                            </li>
+                        }
+                        @foreach (var item in alertas)
+                        {
+                            string colorBadge = item.TipoEvento switch
+                            {
+                                "RIEGO_EMERGENCIA" => "bg-danger",
+                                "RIEGO_PROGRAMADO" => "bg-primary",
+                                "RIEGO_POSPUESTO" => "bg-warning text-dark",
+                                _ => "bg-secondary"
+                            };
+
+                            <li class="list-group-item small">
+                                <div class="d-flex justify-content-between">
+                                    <span class="badge @colorBadge">@item.TipoEvento</span>
+                                    <span class="text-muted">@item.FechaHora.ToString("dd/MM HH:mm:ss")</span>
+                                </div>
+                                <div class="mt-1">@item.Descripcion</div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/monitoreo.js" asp-append-version="true"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            iniciarMonitor(@idActual);
+        });
+    </script>
+}

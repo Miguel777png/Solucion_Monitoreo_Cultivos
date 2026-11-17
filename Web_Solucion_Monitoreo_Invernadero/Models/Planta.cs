@@ -17,29 +17,40 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         [Column("nombre")]
         public string Nombre { get; set; } = string.Empty;
 
-        [Required]
-        [Column("temperatura_maxima", TypeName = "decimal(5,2)")]
-        public decimal TemperaturaMaxima { get; set; }
+        [StringLength(255)]
+        [Column("descripcion")]
+        public string? Descripcion { get; set; }
 
         [Required]
         [Column("temperatura_minima", TypeName = "decimal(5,2)")]
         public decimal TemperaturaMinima { get; set; }
 
         [Required]
-        [Column("humedad_maxima", TypeName = "decimal(5,2)")]
-        public decimal HumedadMaxima { get; set; }
+        [Column("temperatura_maxima", TypeName = "decimal(5,2)")]
+        public decimal TemperaturaMaxima { get; set; }
 
         [Required]
         [Column("humedad_minima", TypeName = "decimal(5,2)")]
         public decimal HumedadMinima { get; set; }
 
+        [Required]
+        [Column("humedad_maxima", TypeName = "decimal(5,2)")]
+        public decimal HumedadMaxima { get; set; }
+
+        [Required]
+        [Column("id_usuario_creacion")]
+        public int IdUsuarioCreacion { get; set; }
+
+        [Column("fecha_actualizacion")]
+        public DateTime FechaActualizacion { get; set; } = DateTime.Now;
+
         [Column("state")]
         public bool State { get; set; } = true;
 
-        // Relación 1:1 con Invernadero
-        public virtual Invernadero? Invernadero { get; set; }
+        [ForeignKey(nameof(IdUsuarioCreacion))]
+        public virtual Usuario? UsuarioCreacion { get; set; }
 
-        // Relación 1:N con CalendarioRiego
-        public virtual ICollection<CalendarioRiego> CalendariosRiego { get; set; } = new List<CalendarioRiego>();
+        // Una especie del catálogo puede estar asignada a varios invernaderos
+        public virtual Invernadero? Invernadero { get; set; }
     }
 }

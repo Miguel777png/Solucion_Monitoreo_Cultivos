@@ -1,0 +1,177 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Planta>
+@{
+    ViewData["Title"] = "Catálogo de Plantas";
+}
+
+<div class="container py-3">
+    <h2 class="fw-bold text-success mb-3">Catálogo de Especies de Orquídeas</h2>
+
+    @if (TempData["MensajeExito"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["MensajeExito"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["MensajeError"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["MensajeError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <!-- Formulario lateral para ingresar nueva planta -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Ingresar Nueva Planta</div>
+                <div class="card-body">
+                    <form asp-action="Crear" method="post">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Nombre de la Especie</label>
+                            <input type="text" name="nombre" class="form-control" placeholder="Ej: Orquídea Vanda" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Descripción (Opcional)</label>
+                            <input type="text" name="descripcion" class="form-control" placeholder="Notas de cultivo..." />
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Temp. Mín (°C)</label>
+                                <input type="number" step="0.1" name="temperaturaMinima" class="form-control" value="18.0" required />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Temp. Máx (°C)</label>
+                                <input type="number" step="0.1" name="temperaturaMaxima" class="form-control" value="25.0" required />
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Humedad Mín (%)</label>
+                                <input type="number" step="0.1" name="humedadMinima" class="form-control" value="70.0" required />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Humedad Máx (%)</label>
+                                <input type="number" step="0.1" name="humedadMaxima" class="form-control" value="85.0" required />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Guardar en Catálogo</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla del catálogo -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Especies Registradas y Asignación (1:1)</div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Especie</th>
+                                <th>Temp (°C)</th>
+                                <th>Humedad (%)</th>
+                                <th>Estado (1:1)</th>
+                                <th>Ingresada por</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@p.Nombre</strong>
+                                        @if (!string.IsNullOrWhiteSpace(p.Descripcion))
+                                        {
+                                            <div class="small text-muted">@p.Descripcion</div>
+                                        }
+                                    </td>
+                                    <td>@p.TemperaturaMinima° - @p.TemperaturaMaxima°</td>
+                                    <td>@p.HumedadMinima% - @p.HumedadMaxima%</td>
+                                    <td>
+                                        @if (p.Invernadero != null && p.Invernadero.State)
+                                        {
+                                            <span class="badge bg-primary">En @p.Invernadero.Nombre</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Disponible</span>
+                                        }
+                                    </td>
+                                    <td class="small">
+                                        ID #@p.IdUsuarioCreacion (@p.UsuarioCreacion?.Nombre)
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal" data-bs-target="#modalEditar-@p.IdPlanta">
+                                            Editar
+                                        </button>
+                                        <form asp-action="Eliminar" method="post" class="d-inline">
+                                            <input type="hidden" name="idPlanta" value="@p.IdPlanta" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('¿Eliminar esta planta del catálogo?');">
+                                                Quitar
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+
+                                <!-- Modal Edición Rápida -->
+                                <div class="modal fade" id="modalEditar-@p.IdPlanta" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form asp-action="Editar" method="post">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Editar Umbrales: @p.Nombre</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="idPlanta" value="@p.IdPlanta" />
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-bold">Nombre</label>
+                                                        <input type="text" name="nombre" class="form-control" value="@p.Nombre" required />
+                                                    </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-bold">Descripción</label>
+                                                        <input type="text" name="descripcion" class="form-control" value="@p.Descripcion" />
+                                                    </div>
+                                                    <div class="row g-2 mb-2">
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">Temp. Mín (°C)</label>
+                                                            <input type="number" step="0.1" name="temperaturaMinima" class="form-control" value="@p.TemperaturaMinima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">Temp. Máx (°C)</label>
+                                                            <input type="number" step="0.1" name="temperaturaMaxima" class="form-control" value="@p.TemperaturaMaxima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                        </div>
+                                                    </div>
+                                                    <div class="row g-2">
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">Humedad Mín (%)</label>
+                                                            <input type="number" step="0.1" name="humedadMinima" class="form-control" value="@p.HumedadMinima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">Humedad Máx (%)</label>
+                                                            <input type="number" step="0.1" name="humedadMaxima" class="form-control" value="@p.HumedadMaxima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

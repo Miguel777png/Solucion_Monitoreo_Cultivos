@@ -1,0 +1,68 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.AuditoriaCambio>
+@{
+    ViewData["Title"] = "Auditoría de Usuarios";
+    var usuarios = ViewBag.Usuarios as List<Web_Solucion_Monitoreo_Invernadero.Models.Usuario> ?? new();
+    int? userSel = ViewBag.IdUsuario;
+}
+
+<div class="container py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="fw-bold text-success mb-0">Auditoría y Trazabilidad por Usuario</h2>
+            <small class="text-muted">Registro histórico de quién creó plantas, asignó invernaderos o programó riegos.</small>
+        </div>
+
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-nowrap mb-0">Filtrar Usuario:</label>
+            <select name="idUsuario" class="form-select form-select-sm">
+                <option value="">Todos los usuarios</option>
+                @foreach (var u in usuarios)
+                {
+                    <option value="@u.IdUsuario" selected="@(userSel == u.IdUsuario)">
+                        ID #@u.IdUsuario — @u.Nombre (@u.Rol)
+                    </option>
+                }
+            </select>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Aplicar</button>
+        </form>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Usuario Responsable</th>
+                        <th>Acción</th>
+                        <th>Módulo / Entidad</th>
+                        <th>Descripción del Cambio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                Aún no se han registrado cambios manuales en la auditoría.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var a in Model)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@a.FechaHora.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td>
+                                <span class="badge bg-primary">ID #@a.IdUsuario</span>
+                                <strong>@a.Usuario?.Nombre</strong>
+                            </td>
+                            <td><span class="badge bg-secondary">@a.Accion</span></td>
+                            <td class="fw-semibold">@a.EntidadAfectada</td>
+                            <td class="small">@a.Detalle</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

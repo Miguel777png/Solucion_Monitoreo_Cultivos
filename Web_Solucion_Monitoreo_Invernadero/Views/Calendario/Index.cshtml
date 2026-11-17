@@ -1,0 +1,164 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.CalendarioRiego>
+@{
+    ViewData["Title"] = "Calendario de Riego";
+    var invernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    int? filtro = ViewBag.FiltroSeleccionado;
+}
+
+<div class="container py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="fw-bold text-success mb-0">Calendario de Riego Inteligente</h2>
+            <small class="text-muted">El sistema verifica la humedad de la planta asignada antes de activar la regadera.</small>
+        </div>
+
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-nowrap mb-0">Filtrar:</label>
+            <select name="idInvernaderoFiltro" class="form-select form-select-sm">
+                <option value="">Todos los invernaderos (3)</option>
+                @foreach (var inv in invernaderos)
+                {
+                    <option value="@inv.IdInvernadero" selected="@(filtro == inv.IdInvernadero)">
+                        @inv.Nombre (@inv.Planta?.Nombre)
+                    </option>
+                }
+            </select>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Aplicar</button>
+        </form>
+    </div>
+
+    @if (TempData["MensajeExito"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["MensajeExito"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["MensajeError"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["MensajeError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Programar Nuevo Riego</div>
+                <div class="card-body">
+                    <form asp-action="Crear" method="post">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Invernadero Destino</label>
+                            <select name="idInvernadero" class="form-select" required>
+                                @foreach (var inv in invernaderos)
+                                {
+                                    <option value="@inv.IdInvernadero">
+                                        @inv.Nombre — @inv.Planta?.Nombre (Mín: @inv.Planta?.HumedadMinima%)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Día Recurrente</label>
+                            <select name="diaSemana" class="form-select">
+                                <option value="Lunes">Lunes</option>
+                                <option value="Martes" selected>Martes</option>
+                                <option value="Miercoles">Miércoles</option>
+                                <option value="Jueves">Jueves</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Sabado">Sábado</option>
+                                <option value="Domingo">Domingo</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">O Fecha Específica (Anula el día recurrente)</label>
+                            <input type="date" name="fechaEspecifica" class="form-control" />
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Hora Exacta</label>
+                                <input type="time" name="horaRiego" class="form-control" required />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Duración (seg)</label>
+                                <input type="number" min="2" max="120" name="tiempoRiegoSeg" value="10" class="form-control" required />
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar Horario</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Horarios Programados Activos</div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Invernadero / Planta</th>
+                                <th>Programación</th>
+                                <th>Hora</th>
+                                <th>Duración</th>
+                                <th>Establecido por</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!Model.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        No hay horarios programados para este filtro.
+                                    </td>
+                                </tr>
+                            }
+                            @foreach (var h in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@h.Invernadero?.Nombre</strong>
+                                        <div class="small text-muted">@h.Invernadero?.Planta?.Nombre</div>
+                                    </td>
+                                    <td>
+                                        @(h.FechaEspecifica.HasValue
+                                            ? h.FechaEspecifica.Value.ToString("dd/MM/yyyy")
+                                            : h.DiaSemana)
+                                    </td>
+                                    <td class="fw-bold">@h.HoraRiego.ToString("HH:mm")</td>
+                                    <td>@h.TiempoRiegoSeg s</td>
+                                    <td class="small">
+                                        ID #@h.IdUsuario (@h.Usuario?.Nombre)
+                                    </td>
+                                    <td>
+                                        @if (h.PospuestoHasta.HasValue)
+                                        {
+                                            <span class="badge bg-warning text-dark">Pospuesto (Humedad óptima)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Activo</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <form asp-action="Eliminar" method="post" class="d-inline">
+                                            <input type="hidden" name="idCalendarioRiego" value="@h.IdCalendarioRiego" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

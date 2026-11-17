@@ -1,0 +1,96 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.RegistroHistorico>
+@{
+    ViewData["Title"] = "Registro Histórico Ambiental";
+    var invernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    int? invSel = ViewBag.IdInvernadero;
+    string? fDesde = ViewBag.FechaDesde;
+    string? fHasta = ViewBag.FechaHasta;
+}
+
+<div class="container py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="fw-bold text-success mb-0">Registro Histórico Ambiental (MySQL)</h2>
+            <small class="text-muted">Lecturas periódicas consolidadas por invernadero.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Bitacora" class="btn btn-outline-warning btn-sm fw-semibold">Ver Bitácora de Riegos/Alertas</a>
+            <a asp-action="ExportarCsv"
+               asp-route-idInvernadero="@invSel"
+               asp-route-fechaDesde="@fDesde"
+               asp-route-fechaHasta="@fHasta"
+               class="btn btn-success btn-sm fw-semibold">
+                Exportar CSV (Excel)
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold mb-1">Invernadero</label>
+                    <select name="idInvernadero" class="form-select form-select-sm">
+                        <option value="">Todos los invernaderos (3)</option>
+                        @foreach (var inv in invernaderos)
+                        {
+                            <option value="@inv.IdInvernadero" selected="@(invSel == inv.IdInvernadero)">
+                                @inv.Nombre (@inv.Planta?.Nombre)
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-1">Desde</label>
+                    <input type="date" name="fechaDesde" value="@fDesde" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-1">Hasta</label>
+                    <input type="date" name="fechaHasta" value="@fHasta" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2 d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+                    <a asp-action="Historial" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Invernadero</th>
+                        <th>Especie Asignada</th>
+                        <th>Humedad (%)</th>
+                        <th>Temperatura (°C)</th>
+                        <th>Fecha y Hora</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No se encontraron registros históricos con los filtros seleccionados.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var r in Model)
+                    {
+                        <tr>
+                            <td class="text-muted small">#@r.IdRegistro</td>
+                            <td class="fw-semibold">@r.Invernadero?.Nombre</td>
+                            <td><span class="badge bg-info text-dark">@r.Invernadero?.Planta?.Nombre</span></td>
+                            <td class="text-primary fw-bold">@r.Humedad %</td>
+                            <td class="text-danger fw-bold">@r.Temperatura °C</td>
+                            <td>@r.FechaHora.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

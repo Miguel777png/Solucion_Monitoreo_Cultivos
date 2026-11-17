@@ -8,15 +8,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
     public class BitacoraRiegoAlerta
     {
         [Key]
-        [Column("id_evento")]
-        public int IdEvento { get; set; }
+        [Column("id_bitacora")]
+        public int IdBitacora { get; set; }
 
         [Required]
         [Column("id_invernadero")]
         public int IdInvernadero { get; set; }
 
         [Required]
-        [StringLength(30)]
+        [StringLength(50)]
         [Column("tipo_evento")]
         public string TipoEvento { get; set; } = string.Empty;
 
@@ -26,13 +26,13 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         public string Descripcion { get; set; } = string.Empty;
 
         [Column("tiempo_activacion_seg")]
-        public int? TiempoActivacionSeg { get; set; }
+        public int TiempoActivacionSeg { get; set; }
 
         [Column("humedad_momento", TypeName = "decimal(5,2)")]
-        public decimal? HumedadMomento { get; set; }
+        public decimal HumedadMomento { get; set; }
 
         [Column("temperatura_momento", TypeName = "decimal(5,2)")]
-        public decimal? TemperaturaMomento { get; set; }
+        public decimal TemperaturaMomento { get; set; }
 
         [Required]
         [Column("fecha_hora")]
@@ -41,7 +41,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         [Column("leida")]
         public bool Leida { get; set; } = false;
 
-        // Llave Foránea
         [ForeignKey(nameof(IdInvernadero))]
         public virtual Invernadero? Invernadero { get; set; }
     }

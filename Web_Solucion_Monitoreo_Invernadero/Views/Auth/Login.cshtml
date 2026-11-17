@@ -1,0 +1,41 @@
+﻿@{
+    ViewData["Title"] = "Iniciar Sesión";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-success text-white text-center py-3">
+                    <h4 class="mb-0 fw-bold">Acceso al Sistema IoT</h4>
+                    <small>Control de Invernaderos de Orquídeas</small>
+                </div>
+                <div class="card-body p-4">
+                    @if (ViewBag.Error != null)
+                    {
+                        <div class="alert alert-danger">@ViewBag.Error</div>
+                    }
+
+                    <form asp-action="Login" method="post">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Correo Electrónico</label>
+                            <input type="email" name="email" class="form-control" value="admin@invernadero.cl" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Contraseña</label>
+                            <input type="password" name="password" class="form-control" value="123456" required />
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Ingresar</button>
+                    </form>
+
+                    <hr />
+                    <div class="small text-muted">
+                        <strong>Cuentas disponibles en BD:</strong><br />
+                        • ID #1: <code>admin@invernadero.cl</code> (Clave: <code>123456</code>)<br />
+                        • ID #2: <code>operador@invernadero.cl</code> (Clave: <code>123456</code>)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
