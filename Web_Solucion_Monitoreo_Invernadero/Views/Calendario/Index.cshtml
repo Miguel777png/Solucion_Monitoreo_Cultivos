@@ -43,12 +43,13 @@
     }
 
     <div class="row g-4">
+        <!-- Formulario con selección excluyente -->
         <div class="col-lg-4">
             <div class="card shadow-sm">
                 <div class="card-header bg-success text-white fw-bold">Programar Nuevo Riego</div>
                 <div class="card-body">
                     <form asp-action="Crear" method="post">
-                        <div class="mb-2">
+                        <div class="mb-3">
                             <label class="form-label small fw-bold">Invernadero Destino</label>
                             <select name="idInvernadero" class="form-select" required>
                                 @foreach (var inv in invernaderos)
@@ -60,9 +61,22 @@
                             </select>
                         </div>
 
+                        <!-- Selector de modo de programación -->
                         <div class="mb-2">
-                            <label class="form-label small fw-bold">Día Recurrente</label>
-                            <select name="diaSemana" class="form-select">
+                            <label class="form-label small fw-bold d-block">Tipo de Programación</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="modoProgramacion" id="radioRecurrente" value="recurrente" checked>
+                                <label class="btn btn-outline-success btn-sm" for="radioRecurrente">Día Recurrente</label>
+
+                                <input type="radio" class="btn-check" name="modoProgramacion" id="radioFechaUnica" value="fecha">
+                                <label class="btn btn-outline-success btn-sm" for="radioFechaUnica">Fecha Específica</label>
+                            </div>
+                        </div>
+
+                        <!-- Bloque 1: Día Recurrente -->
+                        <div id="bloqueRecurrente" class="mb-2">
+                            <label class="form-label small fw-bold">Día de la Semana</label>
+                            <select id="selectDiaSemana" name="diaSemana" class="form-select">
                                 <option value="Lunes">Lunes</option>
                                 <option value="Martes" selected>Martes</option>
                                 <option value="Miercoles">Miércoles</option>
@@ -73,9 +87,10 @@
                             </select>
                         </div>
 
-                        <div class="mb-2">
-                            <label class="form-label small fw-bold">O Fecha Específica (Anula el día recurrente)</label>
-                            <input type="date" name="fechaEspecifica" class="form-control" />
+                        <!-- Bloque 2: Fecha Específica (bloqueado por defecto) -->
+                        <div id="bloqueFechaUnica" class="mb-3 opacity-50">
+                            <label class="form-label small fw-bold">Fecha Exacta</label>
+                            <input type="date" id="inputFechaEspecifica" name="fechaEspecifica" class="form-control" disabled />
                         </div>
 
                         <div class="row g-2 mb-3">
@@ -95,6 +110,7 @@
             </div>
         </div>
 
+        <!-- Tabla de horarios -->
         <div class="col-lg-8">
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-bold">Horarios Programados Activos</div>
@@ -162,3 +178,7 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/registros.js" asp-append-version="true"></script>
+}

@@ -83,3 +83,37 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(actualizarTablaBitacora, 3000);
     }
 });
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const radioRec = document.getElementById('radioRecurrente');
+    const radioFec = document.getElementById('radioFechaUnica');
+    const selectDia = document.getElementById('selectDiaSemana');
+    const inputFecha = document.getElementById('inputFechaEspecifica');
+    const bloqueRec = document.getElementById('bloqueRecurrente');
+    const bloqueFec = document.getElementById('bloqueFechaUnica');
+
+    if (radioRec && radioFec && selectDia && inputFecha) {
+        const actualizarModo = () => {
+            if (radioFec.checked) {
+                selectDia.disabled = true;
+                bloqueRec?.classList.add('opacity-50');
+
+                inputFecha.disabled = false;
+                inputFecha.required = true;
+                bloqueFec?.classList.remove('opacity-50');
+            } else {
+                inputFecha.disabled = true;
+                inputFecha.required = false;
+                inputFecha.value = '';
+                bloqueFec?.classList.add('opacity-50');
+
+                selectDia.disabled = false;
+                bloqueRec?.classList.remove('opacity-50');
+            }
+        };
+
+        radioRec.addEventListener('change', actualizarModo);
+        radioFec.addEventListener('change', actualizarModo);
+    }
+});
