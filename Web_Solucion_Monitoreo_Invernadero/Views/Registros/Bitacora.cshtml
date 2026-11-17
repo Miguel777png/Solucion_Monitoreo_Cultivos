@@ -3,31 +3,61 @@
     ViewData["Title"] = "Bitácora de Riegos y Alertas";
     var invernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
     int? invSel = ViewBag.IdInvernadero;
+    string? tipoSel = ViewBag.TipoEvento;
+    string? fDesde = ViewBag.FechaDesde;
+    string? fHasta = ViewBag.FechaHasta;
 }
 
 <div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
-            <h2 class="fw-bold text-success mb-0">Bitácora Automática de Riegos y Alertas</h2>
+            <div class="d-flex align-items-center gap-2">
+                <h2 class="fw-bold text-success mb-0">Bitácora Automática de Riegos y Alertas</h2>
+                <span class="badge bg-success">Actualización en vivo</span>
+            </div>
             <small class="text-muted">Eventos ejecutados por umbrales críticos y calendario inteligente.</small>
         </div>
         <a asp-action="Historial" class="btn btn-outline-secondary btn-sm">Volver a Historial Ambiental</a>
     </div>
 
+    <!-- Barra de Filtros Combinados -->
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
-            <form method="get" class="d-flex align-items-center gap-2">
-                <label class="small fw-bold text-nowrap mb-0">Invernadero:</label>
-                <select name="idInvernadero" class="form-select form-select-sm" style="max-width: 300px;">
-                    <option value="">Todos los invernaderos (3)</option>
-                    @foreach (var inv in invernaderos)
-                    {
-                        <option value="@inv.IdInvernadero" selected="@(invSel == inv.IdInvernadero)">
-                            @inv.Nombre
-                        </option>
-                    }
-                </select>
-                <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-1">Invernadero</label>
+                    <select name="idInvernadero" class="form-select form-select-sm">
+                        <option value="">Todos los invernaderos (3)</option>
+                        @foreach (var inv in invernaderos)
+                        {
+                            <option value="@inv.IdInvernadero" selected="@(invSel == inv.IdInvernadero)">
+                                @inv.Nombre
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-1">Tipo de Evento</label>
+                    <select name="tipoEvento" class="form-select form-select-sm">
+                        <option value="">Todos los eventos</option>
+                        <option value="RIEGO_EMERGENCIA" selected="@(tipoSel == "RIEGO_EMERGENCIA")">RIEGO_EMERGENCIA</option>
+                        <option value="RIEGO_PROGRAMADO" selected="@(tipoSel == "RIEGO_PROGRAMADO")">RIEGO_PROGRAMADO</option>
+                        <option value="RIEGO_POSPUESTO" selected="@(tipoSel == "RIEGO_POSPUESTO")">RIEGO_POSPUESTO</option>
+                        <option value="ALERTA_UMBRAL" selected="@(tipoSel == "ALERTA_UMBRAL")">ALERTA_UMBRAL</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-1">Desde</label>
+                    <input type="date" name="fechaDesde" value="@fDesde" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-1">Hasta</label>
+                    <input type="date" name="fechaHasta" value="@fHasta" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2 d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+                    <a asp-action="Bitacora" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                </div>
             </form>
         </div>
     </div>
@@ -45,7 +75,7 @@
                         <th>Riego (seg)</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbody-bitacora">
                     @if (!Model.Any())
                     {
                         <tr>
@@ -76,3 +106,7 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/registros.js" asp-append-version="true"></script>
+}

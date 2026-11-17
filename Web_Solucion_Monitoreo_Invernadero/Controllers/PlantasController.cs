@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Globalization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
 using Web_Solucion_Monitoreo_Invernadero.Models;
@@ -17,13 +18,35 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             _auditoria = auditoria;
         }
 
-        // LISTADO DEL CATÁLOGO DE PLANTAS
-        public async Task<IActionResult> Index()
+        // LISTADO DEL CATÁLOGO CON BÚSQUEDA Y FILTRO DE DISPONIBILIDAD
+        public async Task<IActionResult> Index(string? busqueda, string? estadoFiltro)
         {
-            var plantas = await _db.Plantas
+            ViewBag.Busqueda = busqueda;
+            ViewBag.EstadoFiltro = estadoFiltro;
+
+            var consulta = _db.Plantas
                 .Include(p => p.UsuarioCreacion)
                 .Include(p => p.Invernadero)
-                .Where(p => p.State)
+                .Where(p => p.State);
+
+            if (!string.IsNullOrWhiteSpace(busqueda))
+            {
+                string termino = busqueda.Trim();
+                consulta = consulta.Where(p =>
+                    p.Nombre.Contains(termino) ||
+                    (p.Descripcion != null && p.Descripcion.Contains(termino)));
+            }
+
+            if (estadoFiltro == "disponible")
+            {
+                consulta = consulta.Where(p => p.Invernadero == null || !p.Invernadero.State);
+            }
+            else if (estadoFiltro == "asignada")
+            {
+                consulta = consulta.Where(p => p.Invernadero != null && p.Invernadero.State);
+            }
+
+            var plantas = await consulta
                 .OrderBy(p => p.IdPlanta)
                 .ToListAsync();
 
@@ -36,14 +59,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         public async Task<IActionResult> Crear(
             string nombre,
             string? descripcion,
-            decimal temperaturaMinima,
-            decimal temperaturaMaxima,
-            decimal humedadMinima,
-            decimal humedadMaxima)
+            string temperaturaMinima,
+            string temperaturaMaxima,
+            string humedadMinima,
+            string humedadMaxima)
         {
-            if (temperaturaMinima >= temperaturaMaxima || humedadMinima >= humedadMaxima)
+            if (!TryParsearUmbrales(temperaturaMinima, temperaturaMaxima, humedadMinima, humedadMaxima,
+                out decimal tMin, out decimal tMax, out decimal hMin, out decimal hMax, out string error))
             {
-                TempData["MensajeError"] = "Los valores mínimos deben ser estrictamente menores que los máximos.";
+                TempData["MensajeError"] = error;
                 return RedirectToAction(nameof(Index));
             }
 
@@ -53,10 +77,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             {
                 Nombre = nombre.Trim(),
                 Descripcion = descripcion?.Trim(),
-                TemperaturaMinima = temperaturaMinima,
-                TemperaturaMaxima = temperaturaMaxima,
-                HumedadMinima = humedadMinima,
-                HumedadMaxima = humedadMaxima,
+                TemperaturaMinima = tMin,
+                TemperaturaMaxima = tMax,
+                HumedadMinima = hMin,
+                HumedadMaxima = hMax,
                 IdUsuarioCreacion = idUsuario,
                 FechaActualizacion = DateTime.Now,
                 State = true
@@ -68,7 +92,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             await _auditoria.RegistrarAsync(
                 "CREAR_PLANTA",
                 "Plantas",
-                $"Ingresó la planta '{nueva.Nombre}' (Temp: {temperaturaMinima}-{temperaturaMaxima}°C, Hum: {humedadMinima}-{humedadMaxima}%)."
+                $"Ingresó la planta '{nueva.Nombre}' (Temp: {tMin}-{tMax}°C, Hum: {hMin}-{hMax}%)."
             );
 
             TempData["MensajeExito"] = $"Planta '{nueva.Nombre}' agregada al catálogo por Usuario ID #{idUsuario}.";
@@ -82,26 +106,27 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             int idPlanta,
             string nombre,
             string? descripcion,
-            decimal temperaturaMinima,
-            decimal temperaturaMaxima,
-            decimal humedadMinima,
-            decimal humedadMaxima)
+            string temperaturaMinima,
+            string temperaturaMaxima,
+            string humedadMinima,
+            string humedadMaxima)
         {
             var planta = await _db.Plantas.FindAsync(idPlanta);
             if (planta == null) return RedirectToAction(nameof(Index));
 
-            if (temperaturaMinima >= temperaturaMaxima || humedadMinima >= humedadMaxima)
+            if (!TryParsearUmbrales(temperaturaMinima, temperaturaMaxima, humedadMinima, humedadMaxima,
+                out decimal tMin, out decimal tMax, out decimal hMin, out decimal hMax, out string error))
             {
-                TempData["MensajeError"] = "Los valores mínimos deben ser estrictamente menores que los máximos.";
+                TempData["MensajeError"] = error;
                 return RedirectToAction(nameof(Index));
             }
 
             planta.Nombre = nombre.Trim();
             planta.Descripcion = descripcion?.Trim();
-            planta.TemperaturaMinima = temperaturaMinima;
-            planta.TemperaturaMaxima = temperaturaMaxima;
-            planta.HumedadMinima = humedadMinima;
-            planta.HumedadMaxima = humedadMaxima;
+            planta.TemperaturaMinima = tMin;
+            planta.TemperaturaMaxima = tMax;
+            planta.HumedadMinima = hMin;
+            planta.HumedadMaxima = hMax;
             planta.FechaActualizacion = DateTime.Now;
 
             await _db.SaveChangesAsync();
@@ -109,14 +134,14 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             await _auditoria.RegistrarAsync(
                 "EDITAR_PLANTA",
                 "Plantas",
-                $"Actualizó umbrales de '{planta.Nombre}' (Temp: {temperaturaMinima}-{temperaturaMaxima}°C, Hum: {humedadMinima}-{humedadMaxima}%)."
+                $"Actualizó umbrales de '{planta.Nombre}' (Temp: {tMin}-{tMax}°C, Hum: {hMin}-{hMax}%)."
             );
 
-            TempData["MensajeExito"] = $"Umbrales de '{planta.Nombre}' actualizados.";
+            TempData["MensajeExito"] = $"Umbrales de '{planta.Nombre}' actualizados correctamente.";
             return RedirectToAction(nameof(Index));
         }
 
-        // ELIMINAR LÓGICAMENTE UNA PLANTA (SOLO SI NO ESTÁ ASIGNADA A UN INVERNADERO)
+        // ELIMINAR LÓGICAMENTE UNA PLANTA (SOLO SI NO ESTÁ ASIGNADA)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Eliminar(int idPlanta)
@@ -144,6 +169,45 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             TempData["MensajeExito"] = $"Planta '{planta.Nombre}' eliminada del catálogo.";
             return RedirectToAction(nameof(Index));
+        }
+
+        // NORMALIZADOR DECIMAL SEGURO (SOPORTA COMA Y PUNTO SIN MULTIPLICAR POR 10/100)
+        private static bool TryParsearUmbrales(
+            string sTMin, string sTMax, string sHMin, string sHMax,
+            out decimal tMin, out decimal tMax, out decimal hMin, out decimal hMax,
+            out string error)
+        {
+            tMin = tMax = hMin = hMax = 0;
+            error = string.Empty;
+
+            bool ok1 = decimal.TryParse(sTMin?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out tMin);
+            bool ok2 = decimal.TryParse(sTMax?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out tMax);
+            bool ok3 = decimal.TryParse(sHMin?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hMin);
+            bool ok4 = decimal.TryParse(sHMax?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hMax);
+
+            if (!ok1 || !ok2 || !ok3 || !ok4)
+            {
+                error = "Formato numérico inválido en los umbrales.";
+                return false;
+            }
+
+            if (tMin < -10 || tMax > 60 || tMin >= tMax)
+            {
+                error = "La temperatura debe estar entre -10°C y 60°C, y la mínima debe ser menor que la máxima.";
+                return false;
+            }
+
+            if (hMin < 0 || hMax > 100 || hMin >= hMax)
+            {
+                error = "La humedad debe estar entre 0% y 100%, y la mínima debe ser menor que la máxima.";
+                return false;
+            }
+
+            tMin = Math.Round(tMin, 2);
+            tMax = Math.Round(tMax, 2);
+            hMin = Math.Round(hMin, 2);
+            hMax = Math.Round(hMax, 2);
+            return true;
         }
     }
 }

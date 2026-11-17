@@ -1,6 +1,8 @@
 ﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Planta>
 @{
     ViewData["Title"] = "Catálogo de Plantas";
+    string? busqueda = ViewBag.Busqueda;
+    string? estadoFiltro = ViewBag.EstadoFiltro;
 }
 
 <div class="container py-3">
@@ -39,21 +41,21 @@
                         <div class="row g-2 mb-2">
                             <div class="col-6">
                                 <label class="form-label small fw-bold">Temp. Mín (°C)</label>
-                                <input type="number" step="0.1" name="temperaturaMinima" class="form-control" value="18.0" required />
+                                <input type="number" step="0.1" min="-10" max="60" name="temperaturaMinima" class="form-control" value="18.0" required />
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-bold">Temp. Máx (°C)</label>
-                                <input type="number" step="0.1" name="temperaturaMaxima" class="form-control" value="25.0" required />
+                                <input type="number" step="0.1" min="-10" max="60" name="temperaturaMaxima" class="form-control" value="25.0" required />
                             </div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small fw-bold">Humedad Mín (%)</label>
-                                <input type="number" step="0.1" name="humedadMinima" class="form-control" value="70.0" required />
+                                <input type="number" step="0.1" min="0" max="100" name="humedadMinima" class="form-control" value="70.0" required />
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-bold">Humedad Máx (%)</label>
-                                <input type="number" step="0.1" name="humedadMaxima" class="form-control" value="85.0" required />
+                                <input type="number" step="0.1" min="0" max="100" name="humedadMaxima" class="form-control" value="85.0" required />
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success w-100 fw-bold">Guardar en Catálogo</button>
@@ -62,10 +64,33 @@
             </div>
         </div>
 
-        <!-- Tabla del catálogo -->
+        <!-- Tabla del catálogo con buscador y filtro -->
         <div class="col-lg-8">
             <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold">Especies Registradas y Asignación (1:1)</div>
+                <div class="card-header bg-white">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span class="fw-bold">Especies Registradas y Asignación (1:1)</span>
+
+                        <form method="get" class="d-flex flex-wrap align-items-center gap-2">
+                            <input type="text" name="busqueda" value="@busqueda"
+                                   class="form-control form-control-sm" style="width: 170px;"
+                                   placeholder="Buscar especie..." />
+
+                            <select name="estadoFiltro" class="form-select form-select-sm" style="width: 145px;">
+                                <option value="">Todas (@Model.Count)</option>
+                                <option value="disponible" selected="@(estadoFiltro == "disponible")">Disponibles</option>
+                                <option value="asignada" selected="@(estadoFiltro == "asignada")">Asignadas (1:1)</option>
+                            </select>
+
+                            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                            @if (!string.IsNullOrWhiteSpace(busqueda) || !string.IsNullOrWhiteSpace(estadoFiltro))
+                            {
+                                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                            }
+                        </form>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
@@ -79,6 +104,14 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @if (!Model.Any())
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        No se encontraron especies con ese filtro.
+                                    </td>
+                                </tr>
+                            }
                             @foreach (var p in Model)
                             {
                                 <tr>
@@ -141,21 +174,21 @@
                                                     <div class="row g-2 mb-2">
                                                         <div class="col-6">
                                                             <label class="form-label small fw-bold">Temp. Mín (°C)</label>
-                                                            <input type="number" step="0.1" name="temperaturaMinima" class="form-control" value="@p.TemperaturaMinima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                            <input type="number" step="0.1" min="-10" max="60" name="temperaturaMinima" class="form-control" value="@p.TemperaturaMinima.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
                                                         </div>
                                                         <div class="col-6">
                                                             <label class="form-label small fw-bold">Temp. Máx (°C)</label>
-                                                            <input type="number" step="0.1" name="temperaturaMaxima" class="form-control" value="@p.TemperaturaMaxima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                            <input type="number" step="0.1" min="-10" max="60" name="temperaturaMaxima" class="form-control" value="@p.TemperaturaMaxima.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
                                                         </div>
                                                     </div>
                                                     <div class="row g-2">
                                                         <div class="col-6">
                                                             <label class="form-label small fw-bold">Humedad Mín (%)</label>
-                                                            <input type="number" step="0.1" name="humedadMinima" class="form-control" value="@p.HumedadMinima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                            <input type="number" step="0.1" min="0" max="100" name="humedadMinima" class="form-control" value="@p.HumedadMinima.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
                                                         </div>
                                                         <div class="col-6">
                                                             <label class="form-label small fw-bold">Humedad Máx (%)</label>
-                                                            <input type="number" step="0.1" name="humedadMaxima" class="form-control" value="@p.HumedadMaxima.ToString(System.Globalization.CultureInfo.InvariantCulture)" required />
+                                                            <input type="number" step="0.1" min="0" max="100" name="humedadMaxima" class="form-control" value="@p.HumedadMaxima.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
                                                         </div>
                                                     </div>
                                                 </div>

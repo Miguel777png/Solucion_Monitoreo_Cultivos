@@ -27,37 +27,31 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             ViewBag.FechaDesde = fechaDesde?.ToString("yyyy-MM-dd");
             ViewBag.FechaHasta = fechaHasta?.ToString("yyyy-MM-dd");
 
-            var consulta = _db.RegistroHistorico
-                .Include(r => r.Invernadero)
-                    .ThenInclude(i => i!.Planta)
-                .Where(r => r.State);
-
-            if (idInvernadero.HasValue && idInvernadero.Value > 0)
-            {
-                consulta = consulta.Where(r => r.IdInvernadero == idInvernadero.Value);
-            }
-
-            if (fechaDesde.HasValue)
-            {
-                consulta = consulta.Where(r => r.FechaHora >= fechaDesde.Value.Date);
-            }
-
-            if (fechaHasta.HasValue)
-            {
-                var limiteSuperior = fechaHasta.Value.Date.AddDays(1);
-                consulta = consulta.Where(r => r.FechaHora < limiteSuperior);
-            }
-
-            var registros = await consulta
-                .OrderByDescending(r => r.FechaHora)
-                .Take(300)
-                .ToListAsync();
-
+            var registros = await ConsultarHistorialAsync(idInvernadero, fechaDesde, fechaHasta, 300);
             return View(registros);
         }
 
-        // EXPORTACIÓN DIRECTA A CSV (EXCEL)
-        public async Task<IActionResult> ExportarCsv(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
+        // ENDPOINT JSON EN VIVO PARA LA TABLA DE HISTORIAL
+        [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> HistorialJson(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
+        {
+            var datos = await ConsultarHistorialAsync(idInvernadero, fechaDesde, fechaHasta, 300);
+            var resultado = datos.Select(r => new
+            {
+                idRegistro = r.IdRegistro,
+                invernadero = r.Invernadero?.Nombre ?? "",
+                planta = r.Invernadero?.Planta?.Nombre ?? "",
+                humedad = r.Humedad.ToString("0.00"),
+                temperatura = r.Temperatura.ToString("0.00"),
+                fechaHora = r.FechaHora.ToString("dd/MM/yyyy HH:mm:ss")
+            });
+
+            return Json(resultado);
+        }
+
+        private async Task<List<Models.RegistroHistorico>> ConsultarHistorialAsync(
+            int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta, int limite)
         {
             var consulta = _db.RegistroHistorico
                 .Include(r => r.Invernadero)
@@ -73,7 +67,16 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             if (fechaHasta.HasValue)
                 consulta = consulta.Where(r => r.FechaHora < fechaHasta.Value.Date.AddDays(1));
 
-            var datos = await consulta.OrderByDescending(r => r.FechaHora).ToListAsync();
+            return await consulta
+                .OrderByDescending(r => r.FechaHora)
+                .Take(limite)
+                .ToListAsync();
+        }
+
+        // EXPORTACIÓN DIRECTA A CSV (EXCEL)
+        public async Task<IActionResult> ExportarCsv(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
+        {
+            var datos = await ConsultarHistorialAsync(idInvernadero, fechaDesde, fechaHasta, 5000);
 
             var sb = new StringBuilder();
             sb.AppendLine("ID_Registro;Invernadero;Planta_Asignada;Humedad_Pct;Temperatura_C;Fecha_Hora");
@@ -87,8 +90,9 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return File(bytes, "text/csv", $"Historial_Invernaderos_{DateTime.Now:yyyyMMdd_HHmm}.csv");
         }
 
-        // 2. BITÁCORA COMPLETA DE RIEGOS Y ALERTAS AUTOMÁTICAS
-        public async Task<IActionResult> Bitacora(int? idInvernadero)
+        // 2. BITÁCORA COMPLETA DE RIEGOS Y ALERTAS CON FILTROS COMBINADOS
+        public async Task<IActionResult> Bitacora(
+            int? idInvernadero, string? tipoEvento, DateTime? fechaDesde, DateTime? fechaHasta)
         {
             ViewBag.Invernaderos = await _db.Invernaderos
                 .Where(i => i.State)
@@ -96,22 +100,58 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .ToListAsync();
 
             ViewBag.IdInvernadero = idInvernadero;
+            ViewBag.TipoEvento = tipoEvento;
+            ViewBag.FechaDesde = fechaDesde?.ToString("yyyy-MM-dd");
+            ViewBag.FechaHasta = fechaHasta?.ToString("yyyy-MM-dd");
 
+            var eventos = await ConsultarBitacoraAsync(idInvernadero, tipoEvento, fechaDesde, fechaHasta, 200);
+            return View(eventos);
+        }
+
+        // ENDPOINT JSON EN VIVO PARA LA TABLA DE BITÁCORA
+        [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> BitacoraJson(
+            int? idInvernadero, string? tipoEvento, DateTime? fechaDesde, DateTime? fechaHasta)
+        {
+            var eventos = await ConsultarBitacoraAsync(idInvernadero, tipoEvento, fechaDesde, fechaHasta, 200);
+            var resultado = eventos.Select(b => new
+            {
+                fechaHora = b.FechaHora.ToString("dd/MM/yyyy HH:mm:ss"),
+                invernadero = b.Invernadero?.Nombre ?? "",
+                tipoEvento = b.TipoEvento,
+                descripcion = b.Descripcion,
+                humedad = b.HumedadMomento.ToString("0.00"),
+                temperatura = b.TemperaturaMomento.ToString("0.00"),
+                tiempoSeg = b.TiempoActivacionSeg
+            });
+
+            return Json(resultado);
+        }
+
+        private async Task<List<Models.BitacoraRiegoAlerta>> ConsultarBitacoraAsync(
+            int? idInvernadero, string? tipoEvento, DateTime? fechaDesde, DateTime? fechaHasta, int limite)
+        {
             var consulta = _db.BitacoraRiegoAlertas
                 .Include(b => b.Invernadero)
                 .AsQueryable();
 
             if (idInvernadero.HasValue && idInvernadero.Value > 0)
-            {
                 consulta = consulta.Where(b => b.IdInvernadero == idInvernadero.Value);
-            }
 
-            var eventos = await consulta
+            if (!string.IsNullOrWhiteSpace(tipoEvento))
+                consulta = consulta.Where(b => b.TipoEvento == tipoEvento);
+
+            if (fechaDesde.HasValue)
+                consulta = consulta.Where(b => b.FechaHora >= fechaDesde.Value.Date);
+
+            if (fechaHasta.HasValue)
+                consulta = consulta.Where(b => b.FechaHora < fechaHasta.Value.Date.AddDays(1));
+
+            return await consulta
                 .OrderByDescending(b => b.FechaHora)
-                .Take(200)
+                .Take(limite)
                 .ToListAsync();
-
-            return View(eventos);
         }
 
         // 3. AUDITORÍA DE CAMBIOS POR USUARIO
