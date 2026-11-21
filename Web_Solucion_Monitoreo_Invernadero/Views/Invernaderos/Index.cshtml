@@ -1,6 +1,6 @@
 ﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero>
 @{
-    ViewData["Title"] = "Invernaderos (1:1)";
+    ViewData["Title"] = "Invernaderos";
     var seleccionado = ViewBag.Seleccionado as Web_Solucion_Monitoreo_Invernadero.Models.Invernadero;
     var plantasDisponibles = ViewBag.PlantasDisponibles as List<Web_Solucion_Monitoreo_Invernadero.Models.Planta> ?? new();
     var sensoresDisponibles = ViewBag.SensoresDisponibles as List<Web_Solucion_Monitoreo_Invernadero.Models.Sensor> ?? new();
@@ -10,7 +10,7 @@
 <div class="container py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
-            <h2 class="fw-bold text-success mb-0">Gestión de Invernaderos (Relación 1:1)</h2>
+            <h2 class="fw-bold text-success mb-0">Gestión de Invernaderos Relación</h2>
             <small class="text-muted">
                 Selecciona un invernadero de la tabla para ver su detalle y ajustar su configuración.
             </small>
@@ -55,7 +55,7 @@
                                placeholder="Ej: Sector D - Ala Sur" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-bold mb-1">Especie Inicial (Libre 1:1)</label>
+                        <label class="form-label small fw-bold mb-1">Especie Inicial  </label>
                         <select name="idPlanta" class="form-select form-select-sm" required>
                             @if (!plantasDisponibles.Any())
                             {
@@ -172,7 +172,7 @@
                             <input type="hidden" name="idInvernadero" value="@seleccionado.IdInvernadero" />
 
                             <div class="mb-2">
-                                <label class="form-label small fw-bold">Cambiar Especie (Opcional - Solo libres 1:1)</label>
+                                <label class="form-label small fw-bold">Cambiar Especie (Opcional - Solo libres )</label>
                                 <select name="idNuevaPlanta" class="form-select form-select-sm">
                                     <option value="">-- Mantener actual (@seleccionado.Planta?.Nombre) --</option>
                                     @foreach (var p in plantasDisponibles)
@@ -185,7 +185,7 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label small fw-bold">Frecuencia Registro Histórico en BD (minutos)</label>
+                                <label class="form-label small fw-bold">Frecuencia Registro Histórico en BD(minutos) </label>
                                 <input type="number" name="frecuenciaRegistroMin"
                                        min="1" max="1440"
                                        value="@seleccionado.FrecuenciaRegistroMin"

@@ -1,11 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
-using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
-   
     public class AuthController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -16,7 +14,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Login()
+        public IActionResult Login()
         {
             // Si ya tiene sesión iniciada, entra directo al Monitor
             if (HttpContext.Session.GetInt32("IdUsuario").HasValue)
@@ -24,27 +22,33 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 return RedirectToAction("Index", "Monitoreo");
             }
 
-            var usuarios = await _db.Usuarios
-                .Where(u => u.State)
-                .OrderBy(u => u.IdUsuario)
-                .ToListAsync();
-
-            return View(usuarios);
+            return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> IniciarSesion(int idUsuario)
+        public async Task<IActionResult> IniciarSesion(string correo, string password)
         {
-            var usuario = await _db.Usuarios
-                .FirstOrDefaultAsync(u => u.IdUsuario == idUsuario && u.State);
-
-            if (usuario == null)
+            if (string.IsNullOrWhiteSpace(correo) || string.IsNullOrWhiteSpace(password))
             {
-                TempData["MensajeError"] = "Usuario seleccionado no válido o inactivo.";
+                TempData["MensajeError"] = "Debe ingresar su correo y contraseña.";
                 return RedirectToAction(nameof(Login));
             }
 
+            string correoLimpio = correo.Trim().ToLower();
+
+            var usuario = await _db.Usuarios
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == correoLimpio
+                                       && u.PasswordHash == password
+                                       && u.State);
+
+            if (usuario == null)
+            {
+                TempData["MensajeError"] = "Correo o contraseña incorrectos, o usuario inactivo.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            // Mantiene exactamente las mismas variables de sesión de tu sistema y auditoría
             HttpContext.Session.SetInt32("IdUsuario", usuario.IdUsuario);
             HttpContext.Session.SetString("NombreUsuario", usuario.Nombre);
             HttpContext.Session.SetString("RolUsuario", usuario.Rol);

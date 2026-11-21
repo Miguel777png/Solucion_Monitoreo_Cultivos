@@ -23,10 +23,19 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         {
             ViewBag.Busqueda = busqueda;
             ViewBag.EstadoFiltro = estadoFiltro;
-            ViewBag.Invernaderos = await _db.Invernaderos
+
+            var todosInvernaderos = await _db.Invernaderos
+                .Include(i => i.Sensores)
                 .Where(i => i.State)
                 .OrderBy(i => i.IdInvernadero)
                 .ToListAsync();
+
+            ViewBag.Invernaderos = todosInvernaderos;
+
+            // Solo invernaderos que NO tienen ningún sensor asignado actualmente (Regla 1:1)
+            ViewBag.InvernaderosLibres = todosInvernaderos
+                .Where(i => !i.Sensores.Any())
+                .ToList();
 
             var consulta = _db.Sensores
                 .Include(s => s.Invernadero)
@@ -54,7 +63,20 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(sensores);
         }
 
-        // REGISTRAR CÓDIGO HARDWARE EN LISTA BLANCA (OPCIONALMENTE ASIGNADO O DISPONIBLE)
+        // VALIDACIÓN CENTRALIZADA 1:1: Verifica si un invernadero ya tiene un ESP32 asignado
+        private async Task<Sensor?> ObtenerSensorOcupandoInvernaderoAsync(int idInvernadero, int? excluirIdSensor = null)
+        {
+            var consulta = _db.Sensores.Where(s => s.IdInvernadero == idInvernadero);
+
+            if (excluirIdSensor.HasValue)
+            {
+                consulta = consulta.Where(s => s.IdSensor != excluirIdSensor.Value);
+            }
+
+            return await consulta.FirstOrDefaultAsync();
+        }
+
+        // REGISTRAR CÓDIGO HARDWARE EN LISTA BLANCA
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Registrar(
@@ -80,6 +102,19 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             if (idInvernadero.HasValue && idInvernadero.Value > 0)
             {
                 inv = await _db.Invernaderos.FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero.Value && i.State);
+                if (inv == null)
+                {
+                    TempData["MensajeError"] = "El invernadero seleccionado no existe.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Evita el choque UNIQUE en MySQL antes de guardar
+                var sensorExistente = await ObtenerSensorOcupandoInvernaderoAsync(inv.IdInvernadero);
+                if (sensorExistente != null)
+                {
+                    TempData["MensajeError"] = $"No se puede asignar: '{inv.Nombre}' ya tiene vinculado el dispositivo '{sensorExistente.CodigoDispositivo}'. Déjalo Disponible o libera ese invernadero primero.";
+                    return RedirectToAction(nameof(Index));
+                }
             }
 
             var nuevo = new Sensor
@@ -122,6 +157,19 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             if (idInvernadero.HasValue && idInvernadero.Value > 0)
             {
                 nuevoInv = await _db.Invernaderos.FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero.Value && i.State);
+                if (nuevoInv == null)
+                {
+                    TempData["MensajeError"] = "El invernadero destino no es válido.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Evita el choque UNIQUE si otro sensor ya ocupa ese invernadero
+                var ocupante = await ObtenerSensorOcupandoInvernaderoAsync(nuevoInv.IdInvernadero, sensor.IdSensor);
+                if (ocupante != null)
+                {
+                    TempData["MensajeError"] = $"No se puede mover '{sensor.CodigoDispositivo}' a '{nuevoInv.Nombre}' porque ya está ocupado por '{ocupante.CodigoDispositivo}'. Pasa primero '{ocupante.CodigoDispositivo}' a Disponible.";
+                    return RedirectToAction(nameof(Index));
+                }
             }
 
             sensor.IdInvernadero = nuevoInv?.IdInvernadero;

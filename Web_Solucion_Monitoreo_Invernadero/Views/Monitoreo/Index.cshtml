@@ -5,6 +5,10 @@
     var alertas = ViewBag.UltimasAlertas as List<Web_Solucion_Monitoreo_Invernadero.Models.BitacoraRiegoAlerta> ?? new();
     int idActual = Model?.IdInvernadero ?? 1;
     var sensorActual = Model?.Sensores.FirstOrDefault(s => s.State) ?? Model?.Sensores.FirstOrDefault();
+
+    decimal hMin = Model?.Planta?.HumedadMinima ?? 0;
+    decimal hMax = Model?.Planta?.HumedadMaxima ?? 0;
+    decimal hOptimaCalculada = (hMin + hMax) / 2m;
 }
 
 <div id="monitor-app" data-invernadero-id="@idActual" class="container py-3">
@@ -51,7 +55,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <a asp-controller="Monitoreo" asp-action="Index" asp-route-idInvernadero="@inv.IdInvernadero"
                                class="fw-bold text-dark text-decoration-none stretched-link">
-                                @inv.Nombre
+                                <span id="mini-salud-@inv.IdInvernadero" class="me-1" title="Estado de la planta">•</span>@inv.Nombre
                             </a>
                             <div class="d-flex align-items-center gap-1 position-relative" style="z-index: 2;">
                                 <button type="button"
@@ -76,10 +80,15 @@
         }
     </div>
 
-    <!-- 2. ENCABEZADO DEL INVERNADERO SELECCIONADO -->
+    <!-- 2. ENCABEZADO DEL INVERNADERO SELECCIONADO + INDICADOR DE SALUD -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
-            <h2 class="fw-bold text-success mb-0">@Model?.Nombre — @Model?.Planta?.Nombre</h2>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <h2 class="fw-bold text-success mb-0">@Model?.Nombre — @Model?.Planta?.Nombre</h2>
+                <span id="badge-salud-planta" class="badge bg-light text-dark border fs-6 px-3 py-1">
+                    Esperando lectura...
+                </span>
+            </div>
             <small class="text-muted">
                 @Model?.Ubicacion · Dispositivo ESP32: <strong>@(sensorActual?.CodigoDispositivo ?? "Sin asignar")</strong> (@(sensorActual?.NombreNodo ?? "-"))
             </small>
@@ -98,9 +107,14 @@
                     <div class="display-5 fw-bold text-primary my-1">
                         <span id="kpi-humedad">--</span> %
                     </div>
-                    <span class="badge bg-light text-dark border">
-                        Rango óptimo: @Model?.Planta?.HumedadMinima% - @Model?.Planta?.HumedadMaxima%
-                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        <span class="badge bg-light text-dark border">
+                            Mín-Máx: @hMin% - @hMax%
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                            Óptima: ≥ @hOptimaCalculada.ToString("0.0")%
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -165,6 +179,7 @@
                             string colorBadge = item.TipoEvento switch
                             {
                                 "RIEGO_EMERGENCIA" => "bg-danger",
+                                "RIEGO_REDUCIDO" => "bg-success",
                                 "RIEGO_PROGRAMADO" => "bg-primary",
                                 "RIEGO_POSPUESTO" => "bg-warning text-dark",
                                 _ => "bg-secondary"
@@ -183,6 +198,12 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES EN VIVO (TOASTS INFERIOR DERECHA) -->
+<div id="contenedor-toasts-vivo"
+     class="toast-container position-fixed bottom-0 end-0 p-3"
+     style="z-index: 1080;">
 </div>
 
 @section Scripts {

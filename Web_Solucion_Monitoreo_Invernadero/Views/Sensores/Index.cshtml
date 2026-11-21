@@ -1,7 +1,8 @@
 ﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Sensor>
 @{
     ViewData["Title"] = "Sensores IoT (Lista Blanca)";
-    var invernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    var todosInvernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    var invernaderosLibres = ViewBag.InvernaderosLibres as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
     string? busqueda = ViewBag.Busqueda;
     string? estadoFiltro = ViewBag.EstadoFiltro;
 }
@@ -10,7 +11,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
             <h2 class="fw-bold text-primary mb-0">Registro de Sensores ESP32 (Lista Blanca)</h2>
-            <small class="text-muted">Solo los códigos de hardware activos aquí pueden enviar telemetría al servidor.</small>
+            <small class="text-muted">Solo los códigos de hardware activos aquí pueden enviar telemetría al servidor (1 asignado por sector).</small>
         </div>
         <span class="badge bg-danger fs-6">Exclusivo Administrador</span>
     </div>
@@ -48,14 +49,20 @@
                                    placeholder="Ej: Nodo DHT22 + Relé Sector Este" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Invernadero Inicial (Opcional)</label>
+                            <label class="form-label small fw-bold">Invernadero Inicial (Libres)</label>
                             <select name="idInvernadero" class="form-select">
                                 <option value="">-- Dejar Disponible (Sin asignar) --</option>
-                                @foreach (var inv in invernaderos)
+                                @foreach (var inv in invernaderosLibres)
                                 {
-                                    <option value="@inv.IdInvernadero">@inv.Nombre</option>
+                                    <option value="@inv.IdInvernadero">@inv.Nombre (Libre)</option>
                                 }
                             </select>
+                            @if (!invernaderosLibres.Any())
+                            {
+                                <div class="form-text small text-muted">
+                                    Todos los invernaderos actuales ya tienen sensor; el dispositivo quedará en estado <strong>Disponible</strong>.
+                                </div>
+                            }
                         </div>
                         <button type="submit" class="btn btn-primary w-100 fw-bold">
                             Registrar en Lista Blanca
@@ -116,12 +123,18 @@
                                     <td>
                                         <form asp-action="CambiarAsignacion" method="post" class="d-flex gap-1">
                                             <input type="hidden" name="idSensor" value="@s.IdSensor" />
-                                            <select name="idInvernadero" class="form-select form-select-sm" style="width: 175px;">
-                                                <option value="">-- Disponible --</option>
-                                                @foreach (var inv in invernaderos)
+                                            <select name="idInvernadero" class="form-select form-select-sm" style="width: 210px;">
+                                                <option value="">-- Disponible (Liberar) --</option>
+                                                @foreach (var inv in todosInvernaderos)
                                                 {
-                                                    <option value="@inv.IdInvernadero" selected="@(s.IdInvernadero == inv.IdInvernadero)">
-                                                        @inv.Nombre
+                                                    var ocupante = inv.Sensores.FirstOrDefault();
+                                                    bool esElMismo = s.IdInvernadero == inv.IdInvernadero;
+                                                    bool ocupadoPorOtro = ocupante != null && !esElMismo;
+
+                                                    <option value="@inv.IdInvernadero"
+                                                            selected="@esElMismo"
+                                                            disabled="@ocupadoPorOtro">
+                                                        @(ocupadoPorOtro ? $"{inv.Nombre} (Ocupado: {ocupante!.CodigoDispositivo})" : inv.Nombre)
                                                     </option>
                                                 }
                                             </select>

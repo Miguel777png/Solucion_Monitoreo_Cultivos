@@ -1,7 +1,6 @@
-﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Usuario>
-@{
-    ViewData["Title"] = "Iniciar Sesión - Orquídeas IoT";
+﻿@{
     Layout = null;
+    ViewData["Title"] = "Iniciar Sesión — Monitoreo Invernadero";
 }
 <!DOCTYPE html>
 <html lang="es">
@@ -11,51 +10,40 @@
     <title>@ViewData["Title"]</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
 </head>
-<body class="bg-light d-flex align-items-center min-vh-100">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-5">
-                <div class="card shadow border-0">
-                    <div class="card-header bg-success text-white text-center py-3">
-                        <h4 class="fw-bold mb-0">Orquídeas IoT</h4>
-                        <small>Sistema de Monitoreo y Riego Automatizado</small>
-                    </div>
-                    <div class="card-body p-4">
-                        <h5 class="fw-bold text-dark mb-1">Control de Acceso</h5>
-                        <p class="text-muted small mb-3">
-                            Selecciona tu perfil operativo para registrar tu trazabilidad en el sistema.
-                        </p>
-
-                        @if (TempData["MensajeError"] != null)
-                        {
-                            <div class="alert alert-danger small py-2">@TempData["MensajeError"]</div>
-                        }
-
-                        <form asp-action="IniciarSesion" method="post">
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold">Perfil de Usuario</label>
-                                <select name="idUsuario" class="form-select" required>
-                                    @foreach (var u in Model)
-                                    {
-                                        <option value="@u.IdUsuario">
-                                            @u.Nombre — [@u.Rol]
-                                        </option>
-                                    }
-                                </select>
-                            </div>
-
-                            <div class="bg-light border rounded p-2 mb-3 small text-muted">
-                                <div><strong>Administrador:</strong> Gestión total (Invernaderos, Sensores, Auditoría y Riego).</div>
-                                <div class="mt-1"><strong>Jardinero:</strong> Monitoreo en vivo, Plantas, Asignación 1:1 y Calendario.</div>
-                            </div>
-
-                            <button type="submit" class="btn btn-success w-100 fw-bold py-2">
-                                Ingresar al Sistema
-                            </button>
-                        </form>
-                    </div>
-                </div>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+    <div class="card shadow border-0" style="width: 100%; max-width: 410px;">
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <h4 class="fw-bold text-success mb-1">Invernadero IoT</h4>
+                <p class="text-muted small mb-0">Ingrese sus credenciales para continuar</p>
             </div>
+
+            @if (TempData["MensajeError"] != null)
+            {
+                <div class="alert alert-danger py-2 small">
+                    @TempData["MensajeError"]
+                </div>
+            }
+
+            <form asp-controller="Auth" asp-action="IniciarSesion" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Correo electrónico</label>
+                    <input type="email" name="correo" class="form-control"
+                           placeholder="usuario@invernadero.cl" required autofocus />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold">Contraseña</label>
+                    <input type="password" name="password" class="form-control"
+                           placeholder="••••••••" required />
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 fw-bold">
+                    Ingresar
+                </button>
+            </form>
         </div>
     </div>
 </body>
