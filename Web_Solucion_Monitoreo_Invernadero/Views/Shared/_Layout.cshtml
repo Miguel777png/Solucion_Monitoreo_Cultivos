@@ -34,9 +34,7 @@
                             <a class="nav-link text-dark" asp-controller="Plantas" asp-action="Index">Catálogo Plantas</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Invernaderos" asp-action="Index">
-                                @(esAdmin ? "Invernaderos y Sensores" : "Invernaderos (1:1)")
-                            </a>
+                            <a class="nav-link text-dark" asp-controller="Invernaderos" asp-action="Index">Invernaderos (1:1)</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-controller="Calendario" asp-action="Index">Calendario Riego</a>
@@ -46,6 +44,9 @@
                         </li>
                         @if (esAdmin)
                         {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark fw-semibold" asp-controller="Sensores" asp-action="Index">Sensores IoT</a>
+                            </li>
                             <li class="nav-item">
                                 <a class="nav-link text-dark fw-semibold" asp-controller="Registros" asp-action="Auditoria">Auditoría Usuarios</a>
                             </li>

@@ -58,7 +58,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 return NotFound(new { mensaje = $"Dispositivo '{datos.CodigoDispositivo}' no registrado o inactivo." });
             }
 
-            int idInv = sensor.IdInvernadero;
+            int idInv = sensor.IdInvernadero!.Value;
             var estadoRam = _ram.ObtenerOCrear(idInv);
             var planta = sensor.Invernadero.Planta;
 

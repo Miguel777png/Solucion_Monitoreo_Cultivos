@@ -101,7 +101,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // EDITAR UMBRALES DE UNA PLANTA EXISTENTE
+
+        // EDITAR UMBRALES DE UNA PLANTA EXISTENTE (CON TRAZABILIDAD ANTES -> DESPUÉS)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Editar(
@@ -123,6 +124,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            string estadoAnterior = $"{planta.Nombre} (Temp: {planta.TemperaturaMinima}-{planta.TemperaturaMaxima}°C, Hum: {planta.HumedadMinima}-{planta.HumedadMaxima}%)";
+
             planta.Nombre = nombre.Trim();
             planta.Descripcion = descripcion?.Trim();
             planta.TemperaturaMinima = tMin;
@@ -133,15 +136,19 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             await _db.SaveChangesAsync();
 
+            string estadoNuevo = $"{planta.Nombre} (Temp: {tMin}-{tMax}°C, Hum: {hMin}-{hMax}%)";
+
             await _auditoria.RegistrarAsync(
                 "EDITAR_PLANTA",
                 "Plantas",
-                $"Actualizó umbrales de '{planta.Nombre}' (Temp: {tMin}-{tMax}°C, Hum: {hMin}-{hMax}%)."
+                $"ANTES: {estadoAnterior}  --->  DESPUÉS: {estadoNuevo}"
             );
 
             TempData["MensajeExito"] = $"Umbrales de '{planta.Nombre}' actualizados correctamente.";
             return RedirectToAction(nameof(Index));
         }
+
+
 
         // ELIMINAR LÓGICAMENTE UNA PLANTA (SOLO SI NO ESTÁ ASIGNADA)
         [HttpPost]

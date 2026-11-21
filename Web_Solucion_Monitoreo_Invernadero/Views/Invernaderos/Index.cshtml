@@ -1,20 +1,18 @@
 ﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero>
 @{
-    ViewData["Title"] = "Gestión de Invernaderos";
-    var disponibles = ViewBag.PlantasDisponibles as List<Web_Solucion_Monitoreo_Invernadero.Models.Planta> ?? new();
+    ViewData["Title"] = "Invernaderos (1:1)";
+    var seleccionado = ViewBag.Seleccionado as Web_Solucion_Monitoreo_Invernadero.Models.Invernadero;
+    var plantasDisponibles = ViewBag.PlantasDisponibles as List<Web_Solucion_Monitoreo_Invernadero.Models.Planta> ?? new();
+    var sensoresDisponibles = ViewBag.SensoresDisponibles as List<Web_Solucion_Monitoreo_Invernadero.Models.Sensor> ?? new();
     bool esAdmin = ViewBag.EsAdministrador == true;
 }
 
 <div class="container py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
-            <h2 class="fw-bold text-success mb-0">
-                @(esAdmin ? "Administración de Invernaderos y Sensores IoT" : "Asignación de Especies por Invernadero (1:1)")
-            </h2>
+            <h2 class="fw-bold text-success mb-0">Gestión de Invernaderos (Relación 1:1)</h2>
             <small class="text-muted">
-                @(esAdmin
-                    ? "Crea nuevos sectores, vincula placas ESP32 y gestiona la especie de cada invernadero."
-                    : "Selecciona la especie disponible que será monitoreada en cada invernadero.")
+                Selecciona un invernadero de la tabla para ver su detalle y ajustar su configuración.
             </small>
         </div>
         <span class="badge @(esAdmin ? "bg-danger" : "bg-success") fs-6">
@@ -37,169 +35,232 @@
         </div>
     }
 
-    @* PANEL DE INFRAESTRUCTURA: VISIBLE SOLO PARA ADMINISTRADORES *@
+    @* FORMULARIO COMPACTO DE ALTA: SOLO ADMINISTRADOR *@
     @if (esAdmin)
     {
-        <div class="row g-3 mb-4">
-            <!-- Crear Nuevo Invernadero -->
-            <div class="col-lg-6">
-                <div class="card border-success shadow-sm h-100">
-                    <div class="card-header bg-success text-white fw-bold">
-                        + Crear Nuevo Invernadero
-                    </div>
-                    <div class="card-body">
-                        <form asp-action="CrearInvernadero" method="post" class="row g-2">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Nombre del Invernadero</label>
-                                <input type="text" name="nombre" class="form-control form-control-sm"
-                                       placeholder="Ej: Invernadero Este" required />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Ubicación</label>
-                                <input type="text" name="ubicacion" class="form-control form-control-sm"
-                                       placeholder="Ej: Pabellón B - Sector 4" />
-                            </div>
-                            <div class="col-md-7">
-                                <label class="form-label small fw-bold">Especie Inicial (Disponible 1:1)</label>
-                                <select name="idPlanta" class="form-select form-select-sm" required>
-                                    @if (!disponibles.Any())
-                                    {
-                                        <option value="">-- Crea una planta libre en Catálogo primero --</option>
-                                    }
-                                    @foreach (var p in disponibles)
-                                    {
-                                        <option value="@p.IdPlanta">@p.Nombre (H: @p.HumedadMinima% - @p.HumedadMaxima%)</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-md-5">
-                                <label class="form-label small fw-bold">Guardado BD (min)</label>
-                                <input type="number" name="frecuenciaRegistroMin" min="1" max="120" value="5"
-                                       class="form-control form-control-sm" required />
-                            </div>
-                            <div class="col-12 mt-2">
-                                <button type="submit" class="btn btn-success btn-sm w-100 fw-bold"
-                                        disabled="@(!disponibles.Any())">
-                                    Registrar Invernadero
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+        <div class="card border-success shadow-sm mb-4">
+            <div class="card-header bg-success text-white fw-bold py-2">
+                + Crear Nuevo Invernadero
             </div>
-
-            <!-- Registrar Nuevo Sensor ESP32 -->
-            <div class="col-lg-6">
-                <div class="card border-primary shadow-sm h-100">
-                    <div class="card-header bg-primary text-white fw-bold">
-                        + Registrar Dispositivo ESP32
+            <div class="card-body py-3">
+                <form asp-action="CrearInvernadero" method="post" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-1">Nombre del Sector</label>
+                        <input type="text" name="nombre" class="form-control form-control-sm"
+                               placeholder="Ej: Invernadero Este" required />
                     </div>
-                    <div class="card-body">
-                        <form asp-action="RegistrarSensor" method="post" class="row g-2">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Invernadero Destino</label>
-                                <select name="idInvernadero" class="form-select form-select-sm" required>
-                                    @foreach (var inv in Model)
-                                    {
-                                        <option value="@inv.IdInvernadero">@inv.Nombre</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Código Hardware (Lista Blanca)</label>
-                                <input type="text" name="codigoDispositivo" class="form-control form-control-sm"
-                                       placeholder="Ej: ESP32-ORQ-04" required />
-                            </div>
-                            <div class="col-md-12">
-                                <label class="form-label small fw-bold">Nombre Descriptivo del Nodo</label>
-                                <input type="text" name="nombreNodo" class="form-control form-control-sm"
-                                       placeholder="Ej: Sensor DHT22 + Relé Sector Este" />
-                            </div>
-                            <div class="col-12 mt-2">
-                                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
-                                    Vincular ESP32 al Invernadero
-                                </button>
-                            </div>
-                        </form>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-1">Ubicación</label>
+                        <input type="text" name="ubicacion" class="form-control form-control-sm"
+                               placeholder="Ej: Sector D - Ala Sur" />
                     </div>
-                </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-1">Especie Inicial (Libre 1:1)</label>
+                        <select name="idPlanta" class="form-select form-select-sm" required>
+                            @if (!plantasDisponibles.Any())
+                            {
+                                <option value="">-- Sin especies libres --</option>
+                            }
+                            @foreach (var p in plantasDisponibles)
+                            {
+                                <option value="@p.IdPlanta">@p.Nombre</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small fw-bold mb-1">BD (min)</label>
+                        <input type="number" name="frecuenciaRegistroMin" min="1" max="1440" value="60"
+                               class="form-control form-control-sm" required />
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-success btn-sm w-100 fw-bold"
+                                disabled="@(!plantasDisponibles.Any())">
+                            Registrar
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     }
 
-    @* TARJETAS DE INVERNADEROS ACTIVOS (VISIBLE PARA AMBOS ROLES) *@
     <div class="row g-4">
-        @foreach (var inv in Model)
-        {
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100 border-top border-success border-4">
-                    <div class="card-body d-flex flex-column">
-                        <div class="d-flex justify-content-between align-items-start mb-1">
-                            <h5 class="fw-bold text-dark mb-0">@inv.Nombre</h5>
-                            <span class="badge bg-light text-dark border">ID #@inv.IdInvernadero</span>
-                        </div>
-                        <small class="text-muted mb-3">@inv.Ubicacion · BD cada @inv.FrecuenciaRegistroMin min</small>
-
-                        <!-- Sensores asociados -->
-                        <div class="mb-3">
-                            <div class="small fw-bold text-muted mb-1">Sensores ESP32 Vinculados:</div>
-                            @if (!inv.Sensores.Any())
+        <!-- MAESTRO: TABLA ESCALABLE DE INVERNADEROS -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+                    <span class="fw-bold">Invernaderos Activos (@Model.Count)</span>
+                    <input type="text" id="buscador-tabla-inv" class="form-control form-control-sm"
+                           style="max-width: 220px;" placeholder="Filtrar tabla..." />
+                </div>
+                <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0" id="tabla-invernaderos">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>ID</th>
+                                <th>Invernadero</th>
+                                <th>Especie Asignada</th>
+                                <th>Sensor ESP32</th>
+                                <th>BD</th>
+                                <th class="text-end">Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var inv in Model)
                             {
-                                <span class="badge bg-warning text-dark">Sin ESP32 asignado</span>
-                            }
-                            @foreach (var s in inv.Sensores)
-                            {
-                                <div class="d-flex justify-content-between align-items-center bg-light border rounded px-2 py-1 mb-1 small">
-                                    <div>
-                                        <code>@s.CodigoDispositivo</code>
-                                        <span class="badge @(s.State ? "bg-success" : "bg-secondary") ms-1">
-                                            @(s.State ? "Activo" : "Inactivo")
-                                        </span>
-                                    </div>
-                                    @if (esAdmin)
-                                    {
-                                        <form asp-action="AlternarEstadoSensor" method="post" class="d-inline">
-                                            <input type="hidden" name="idSensor" value="@s.IdSensor" />
-                                            <button type="submit" class="btn btn-link btn-sm p-0 text-decoration-none">
-                                                @(s.State ? "Desactivar" : "Activar")
-                                            </button>
-                                        </form>
-                                    }
-                                </div>
-                            }
-                        </div>
+                                bool activo = seleccionado != null && inv.IdInvernadero == seleccionado.IdInvernadero;
+                                var sensor = inv.Sensores.FirstOrDefault(s => s.State);
 
-                        <!-- Especie actual -->
-                        <div class="bg-light p-2 rounded border mb-3">
-                            <div class="small text-muted">Especie Actual Asignada:</div>
-                            <div class="fw-bold text-success fs-5">@inv.Planta?.Nombre</div>
-                            <div class="small text-dark mt-1">
-                                Humedad: <strong>@inv.Planta?.HumedadMinima% - @inv.Planta?.HumedadMaxima%</strong><br />
-                                Temp: <strong>@inv.Planta?.TemperaturaMinima°C - @inv.Planta?.TemperaturaMaxima°C</strong>
+                                <tr class="@(activo ? "table-success fw-semibold" : "") fila-invernadero"
+                                    data-texto="@($"{inv.Nombre} {inv.Ubicacion} {inv.Planta?.Nombre} {sensor?.CodigoDispositivo}".ToLower())">
+                                    <td>#@inv.IdInvernadero</td>
+                                    <td>
+                                        <div>@inv.Nombre</div>
+                                        <small class="text-muted fw-normal">@inv.Ubicacion</small>
+                                    </td>
+                                    <td class="text-success">@inv.Planta?.Nombre</td>
+                                    <td>
+                                        @if (sensor != null)
+                                        {
+                                            <code>@sensor.CodigoDispositivo</code>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark">Sin ESP32</span>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">@inv.FrecuenciaRegistroMin min</span></td>
+                                    <td class="text-end">
+                                        <a asp-action="Index" asp-route-idSeleccionado="@inv.IdInvernadero"
+                                           class="btn btn-sm @(activo ? "btn-success" : "btn-outline-success")">
+                                            @(activo ? "Seleccionado" : "Ver")
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DETALLE: FICHA DEL INVERNADERO SELECCIONADO -->
+        <div class="col-lg-5">
+            @if (seleccionado != null)
+            {
+                var sensorSel = seleccionado.Sensores.FirstOrDefault(s => s.State);
+
+                <div class="card shadow-sm border-top border-success border-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-success fs-5">@seleccionado.Nombre</span>
+                        <span class="badge bg-light text-dark border">ID #@seleccionado.IdInvernadero</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">@seleccionado.Ubicacion</p>
+
+                        <!-- Resumen de Especie Actual -->
+                        <div class="bg-light border rounded p-3 mb-3">
+                            <div class="small text-muted">Especie Actual Monitoreada:</div>
+                            <div class="fw-bold text-success fs-5">@seleccionado.Planta?.Nombre</div>
+                            <div class="small mt-1">
+                                Humedad óptima: <strong>@seleccionado.Planta?.HumedadMinima% - @seleccionado.Planta?.HumedadMaxima%</strong><br />
+                                Temperatura óptima: <strong>@seleccionado.Planta?.TemperaturaMinima°C - @seleccionado.Planta?.TemperaturaMaxima°C</strong>
                             </div>
                         </div>
 
-                        <!-- Formulario de cambio de especie (1:1) -->
-                        <form asp-action="AsignarPlanta" method="post" class="mt-auto">
-                            <input type="hidden" name="idInvernadero" value="@inv.IdInvernadero" />
-                            <label class="form-label small fw-bold">Cambiar Especie (Solo disponibles)</label>
-                            <select name="idPlanta" class="form-select form-select-sm mb-2" required>
-                                <option value="">-- Seleccionar especie libre --</option>
-                                @foreach (var p in disponibles)
-                                {
-                                    <option value="@p.IdPlanta">
-                                        @p.Nombre (H: @p.HumedadMinima%-@p.HumedadMaxima%)
-                                    </option>
-                                }
-                            </select>
-                            <button type="submit" class="btn btn-outline-success btn-sm w-100 fw-bold"
-                                    disabled="@(!disponibles.Any())">
-                                @(disponibles.Any() ? "Asignar Nueva Especie" : "Sin plantas libres en catálogo")
+                        <!-- Formulario Operativo (Jardinero y Administrador) -->
+                        <form asp-action="ActualizarConfiguracionOperativa" method="post" class="mb-4">
+                            <input type="hidden" name="idInvernadero" value="@seleccionado.IdInvernadero" />
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">Cambiar Especie (Opcional - Solo libres 1:1)</label>
+                                <select name="idNuevaPlanta" class="form-select form-select-sm">
+                                    <option value="">-- Mantener actual (@seleccionado.Planta?.Nombre) --</option>
+                                    @foreach (var p in plantasDisponibles)
+                                    {
+                                        <option value="@p.IdPlanta">
+                                            @p.Nombre (H: @p.HumedadMinima%-@p.HumedadMaxima%)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Frecuencia Registro Histórico en BD (minutos)</label>
+                                <input type="number" name="frecuenciaRegistroMin"
+                                       min="1" max="1440"
+                                       value="@seleccionado.FrecuenciaRegistroMin"
+                                       class="form-control form-control-sm" required />
+                                <div class="form-text small">Define cada cuántos minutos se guarda una fila en el historial.</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-sm w-100 fw-bold">
+                                Guardar Configuración Operativa
                             </button>
                         </form>
+
+                        <hr />
+
+                        <!-- Sección Hardware ESP32 -->
+                        <div>
+                            <div class="small fw-bold text-muted mb-1">Dispositivo ESP32 Vinculado:</div>
+                            @if (sensorSel != null)
+                            {
+                                <div class="alert alert-light border py-2 px-3 small mb-2 d-flex justify-content-between align-items-center">
+                                    <span><code>@sensorSel.CodigoDispositivo</code> — @sensorSel.NombreNodo</span>
+                                    <span class="badge bg-success">Activo</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning py-2 px-3 small mb-2">
+                                    Este invernadero aún no tiene un ESP32 vinculado.
+                                </div>
+                            }
+
+                            @if (esAdmin)
+                            {
+                                <form asp-action="AsignarSensorDisponible" method="post" class="mt-2">
+                                    <input type="hidden" name="idInvernadero" value="@seleccionado.IdInvernadero" />
+                                    <label class="form-label small fw-bold text-primary">
+                                        Vincular Sensor Disponible (Lista Blanca)
+                                    </label>
+                                    <div class="d-flex gap-2">
+                                        <select name="idSensor" class="form-select form-select-sm" required>
+                                            @if (!sensoresDisponibles.Any())
+                                            {
+                                                <option value="">-- No hay sensores disponibles --</option>
+                                            }
+                                            @foreach (var s in sensoresDisponibles)
+                                            {
+                                                <option value="@s.IdSensor">@s.CodigoDispositivo (@s.NombreNodo)</option>
+                                            }
+                                        </select>
+                                        <button type="submit" class="btn btn-primary btn-sm"
+                                                disabled="@(!sensoresDisponibles.Any())">
+                                            Vincular
+                                        </button>
+                                    </div>
+                                    <div class="form-text small">
+                                        Para autorizar un código nuevo, regístralo primero en <a asp-controller="Sensores" asp-action="Index">Sensores IoT</a>.
+                                    </div>
+                                </form>
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
-        }
+            }
+        </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.getElementById('buscador-tabla-inv')?.addEventListener('input', function (e) {
+            const filtro = (e.target && 'value' in e.target ? String(e.target.value) : '').trim().toLowerCase();
+            document.querySelectorAll('.fila-invernadero').forEach(function (fila) {
+                const texto = (fila.getAttribute('data-texto') || '').toLowerCase();
+                fila.classList.toggle('d-none', Boolean(filtro) && !texto.includes(filtro));
+            });
+        });
+    </script>
+}

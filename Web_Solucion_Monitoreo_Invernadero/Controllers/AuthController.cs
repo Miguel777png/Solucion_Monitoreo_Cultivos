@@ -5,7 +5,7 @@ using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
-    [VerificarAcceso]
+   
     public class AuthController : Controller
     {
         private readonly ApplicationDbContext _db;

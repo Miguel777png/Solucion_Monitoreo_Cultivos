@@ -19,8 +19,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             _auditoria = auditoria;
         }
 
-        // VISTA PRINCIPAL (Adapta controles según el rol de la sesión)
-        public async Task<IActionResult> Index()
+        // VISTA MAESTRO-DETALLE (TABLA + FICHA SELECCIONADA)
+        public async Task<IActionResult> Index(int? idSeleccionado)
         {
             var invernaderos = await _db.Invernaderos
                 .Include(i => i.Planta)
@@ -29,63 +29,100 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .OrderBy(i => i.IdInvernadero)
                 .ToListAsync();
 
-            // Plantas activas que NO están asignadas a otro invernadero activo (Regla 1:1)
+            var seleccionado = idSeleccionado.HasValue
+                ? invernaderos.FirstOrDefault(i => i.IdInvernadero == idSeleccionado.Value)
+                : invernaderos.FirstOrDefault();
+
+            seleccionado ??= invernaderos.FirstOrDefault();
+
+            // Plantas activas libres (no asignadas a otro invernadero activo)
             var plantasDisponibles = await _db.Plantas
                 .Include(p => p.Invernadero)
                 .Where(p => p.State && (p.Invernadero == null || !p.Invernadero.State))
                 .OrderBy(p => p.Nombre)
                 .ToListAsync();
 
+            // Sensores activos en lista blanca sin invernadero asignado
+            var sensoresDisponibles = await _db.Sensores
+                .Where(s => s.State && s.IdInvernadero == null)
+                .OrderBy(s => s.CodigoDispositivo)
+                .ToListAsync();
+
+            ViewBag.Seleccionado = seleccionado;
             ViewBag.PlantasDisponibles = plantasDisponibles;
+            ViewBag.SensoresDisponibles = sensoresDisponibles;
             ViewBag.EsAdministrador = (HttpContext.Session.GetString("RolUsuario") ?? "")
                 .Equals("Administrador", StringComparison.OrdinalIgnoreCase);
 
             return View(invernaderos);
         }
 
-        // ACCIÓN PERMITIDA PARA JARDINERO Y ADMINISTRADOR: Cambiar especie asignada (1:1)
+        // JARDINERO Y ADMINISTRADOR: Actualizar especie (1:1) y frecuencia histórica con ANTES -> DESPUÉS
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AsignarPlanta(int idInvernadero, int idPlanta)
+        public async Task<IActionResult> ActualizarConfiguracionOperativa(
+            int idInvernadero,
+            int? idNuevaPlanta,
+            int frecuenciaRegistroMin)
         {
             var invernadero = await _db.Invernaderos
                 .Include(i => i.Planta)
                 .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero && i.State);
 
-            var nuevaPlanta = await _db.Plantas
-                .Include(p => p.Invernadero)
-                .FirstOrDefaultAsync(p => p.IdPlanta == idPlanta && p.State);
-
-            if (invernadero == null || nuevaPlanta == null)
+            if (invernadero == null)
             {
-                TempData["MensajeError"] = "Invernadero o especie no válida.";
+                TempData["MensajeError"] = "Invernadero no encontrado.";
                 return RedirectToAction(nameof(Index));
             }
 
-            if (nuevaPlanta.Invernadero != null &&
-                nuevaPlanta.Invernadero.State &&
-                nuevaPlanta.Invernadero.IdInvernadero != idInvernadero)
+            int nuevaFrecuencia = frecuenciaRegistroMin > 0 ? frecuenciaRegistroMin : 60;
+            string plantaAntes = invernadero.Planta?.Nombre ?? "Sin especie";
+            int freqAntes = invernadero.FrecuenciaRegistroMin;
+
+            string plantaDespues = plantaAntes;
+
+            // Si seleccionó cambiar de planta, valida regla 1:1
+            if (idNuevaPlanta.HasValue && idNuevaPlanta.Value > 0 && idNuevaPlanta.Value != invernadero.IdPlanta)
             {
-                TempData["MensajeError"] = $"La especie '{nuevaPlanta.Nombre}' ya está ocupada en '{nuevaPlanta.Invernadero.Nombre}'.";
-                return RedirectToAction(nameof(Index));
+                var nuevaPlanta = await _db.Plantas
+                    .Include(p => p.Invernadero)
+                    .FirstOrDefaultAsync(p => p.IdPlanta == idNuevaPlanta.Value && p.State);
+
+                if (nuevaPlanta == null)
+                {
+                    TempData["MensajeError"] = "La especie seleccionada no es válida.";
+                    return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
+                }
+
+                if (nuevaPlanta.Invernadero != null &&
+                    nuevaPlanta.Invernadero.State &&
+                    nuevaPlanta.Invernadero.IdInvernadero != idInvernadero)
+                {
+                    TempData["MensajeError"] = $"La especie '{nuevaPlanta.Nombre}' ya está asignada a '{nuevaPlanta.Invernadero.Nombre}'.";
+                    return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
+                }
+
+                invernadero.IdPlanta = nuevaPlanta.IdPlanta;
+                plantaDespues = nuevaPlanta.Nombre;
             }
 
-            string plantaAnterior = invernadero.Planta?.Nombre ?? "Ninguna";
-            invernadero.IdPlanta = nuevaPlanta.IdPlanta;
+            invernadero.FrecuenciaRegistroMin = nuevaFrecuencia;
+            invernadero.IdUsuarioModificacion = HttpContext.Session.GetInt32("IdUsuario") ?? 1;
+            invernadero.FechaModificacion = DateTime.Now;
 
             await _db.SaveChangesAsync();
 
             await _auditoria.RegistrarAsync(
-                "ASIGNAR_PLANTA_INVERNADERO",
+                "CONFIGURAR_INVERNADERO",
                 invernadero.Nombre,
-                $"Cambió especie asignada de '{plantaAnterior}' a '{nuevaPlanta.Nombre}'."
+                $"ANTES: Especie '{plantaAntes}', Guardado cada {freqAntes} min  --->  DESPUÉS: Especie '{plantaDespues}', Guardado cada {nuevaFrecuencia} min"
             );
 
-            TempData["MensajeExito"] = $"'{nuevaPlanta.Nombre}' asignada correctamente a {invernadero.Nombre}.";
-            return RedirectToAction(nameof(Index));
+            TempData["MensajeExito"] = $"Configuración de '{invernadero.Nombre}' actualizada correctamente.";
+            return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
         }
 
-        // ACCIÓN EXCLUSIVA ADMINISTRADOR: Crear nuevo Invernadero
+        // EXCLUSIVO ADMINISTRADOR: Crear nuevo Invernadero
         [HttpPost]
         [ValidateAntiForgeryToken]
         [VerificarAcceso(SoloAdministrador = true)]
@@ -101,11 +138,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             if (planta == null || (planta.Invernadero != null && planta.Invernadero.State))
             {
-                TempData["MensajeError"] = "Debes seleccionar una especie disponible del catálogo (no asignada a otro invernadero).";
+                TempData["MensajeError"] = "Debes elegir una especie disponible del catálogo (no asignada a otro sector).";
                 return RedirectToAction(nameof(Index));
             }
 
-            int frecuencia = frecuenciaRegistroMin > 0 ? frecuenciaRegistroMin : 5;
+            int frecuencia = frecuenciaRegistroMin > 0 ? frecuenciaRegistroMin : 60;
+            int idUsuario = HttpContext.Session.GetInt32("IdUsuario") ?? 1;
 
             var nuevoInv = new Invernadero
             {
@@ -113,6 +151,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 Ubicacion = string.IsNullOrWhiteSpace(ubicacion) ? "Sector General" : ubicacion.Trim(),
                 IdPlanta = planta.IdPlanta,
                 FrecuenciaRegistroMin = frecuencia,
+                IdUsuarioModificacion = idUsuario,
                 State = true
             };
 
@@ -122,92 +161,53 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             await _auditoria.RegistrarAsync(
                 "CREAR_INVERNADERO",
                 nuevoInv.Nombre,
-                $"Creó invernadero '{nuevoInv.Nombre}' ({nuevoInv.Ubicacion}) con especie '{planta.Nombre}' y guardado cada {frecuencia} min."
+                $"Creó sector '{nuevoInv.Nombre}' ({nuevoInv.Ubicacion}) con especie '{planta.Nombre}' y guardado cada {frecuencia} min."
             );
 
             TempData["MensajeExito"] = $"Invernadero '{nuevoInv.Nombre}' creado correctamente.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { idSeleccionado = nuevoInv.IdInvernadero });
         }
 
-        // ACCIÓN EXCLUSIVA ADMINISTRADOR: Registrar nuevo nodo ESP32
+        // EXCLUSIVO ADMINISTRADOR: Vincular sensor disponible de la lista blanca al invernadero seleccionado
         [HttpPost]
         [ValidateAntiForgeryToken]
         [VerificarAcceso(SoloAdministrador = true)]
-        public async Task<IActionResult> RegistrarSensor(
-            int idInvernadero,
-            string codigoDispositivo,
-            string nombreNodo)
+        public async Task<IActionResult> AsignarSensorDisponible(int idInvernadero, int idSensor)
         {
-            if (string.IsNullOrWhiteSpace(codigoDispositivo))
+            var invernadero = await _db.Invernaderos
+                .Include(i => i.Sensores)
+                .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero && i.State);
+
+            var sensorNuevo = await _db.Sensores
+                .FirstOrDefaultAsync(s => s.IdSensor == idSensor && s.State && s.IdInvernadero == null);
+
+            if (invernadero == null || sensorNuevo == null)
             {
-                TempData["MensajeError"] = "El código de dispositivo del ESP32 es obligatorio.";
-                return RedirectToAction(nameof(Index));
+                TempData["MensajeError"] = "El sensor seleccionado ya no está disponible o el invernadero no es válido.";
+                return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
             }
 
-            string codigoLimpio = codigoDispositivo.Trim().ToUpper();
+            // Si el invernadero ya tenía un sensor previo, lo libera a estado Disponible
+            var sensorPrevio = invernadero.Sensores.FirstOrDefault();
+            string sensorAntes = sensorPrevio?.CodigoDispositivo ?? "Sin sensor asignado";
 
-            bool yaExiste = await _db.Sensores.AnyAsync(s => s.CodigoDispositivo == codigoLimpio);
-            if (yaExiste)
+            if (sensorPrevio != null)
             {
-                TempData["MensajeError"] = $"El código '{codigoLimpio}' ya se encuentra registrado en el sistema.";
-                return RedirectToAction(nameof(Index));
+                sensorPrevio.IdInvernadero = null;
+                sensorPrevio.EstadoConexion = "Desconectado";
             }
 
-            var inv = await _db.Invernaderos.FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero && i.State);
-            if (inv == null)
-            {
-                TempData["MensajeError"] = "El invernadero seleccionado no existe.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            var nuevoSensor = new Sensor
-            {
-                IdInvernadero = idInvernadero,
-                CodigoDispositivo = codigoLimpio,
-                NombreNodo = string.IsNullOrWhiteSpace(nombreNodo) ? $"Nodo {codigoLimpio}" : nombreNodo.Trim(),
-                EstadoConexion = "Desconectado",
-                State = true
-            };
-
-            _db.Sensores.Add(nuevoSensor);
+            sensorNuevo.IdInvernadero = idInvernadero;
             await _db.SaveChangesAsync();
 
             await _auditoria.RegistrarAsync(
-                "REGISTRAR_SENSOR_ESP32",
-                inv.Nombre,
-                $"Vinculó el dispositivo '{codigoLimpio}' ({nuevoSensor.NombreNodo}) al invernadero '{inv.Nombre}'."
+                "VINCULAR_SENSOR_INVERNADERO",
+                invernadero.Nombre,
+                $"Sensor vinculado | ANTES: {sensorAntes}  --->  DESPUÉS: {sensorNuevo.CodigoDispositivo}"
             );
 
-            TempData["MensajeExito"] = $"Sensor '{codigoLimpio}' registrado y asociado a {inv.Nombre}.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        // ACCIÓN EXCLUSIVA ADMINISTRADOR: Activar/Desactivar sensor en mantenimiento
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [VerificarAcceso(SoloAdministrador = true)]
-        public async Task<IActionResult> AlternarEstadoSensor(int idSensor)
-        {
-            var sensor = await _db.Sensores
-                .Include(s => s.Invernadero)
-                .FirstOrDefaultAsync(s => s.IdSensor == idSensor);
-
-            if (sensor != null)
-            {
-                sensor.State = !sensor.State;
-                if (!sensor.State) sensor.EstadoConexion = "Inactivo";
-                await _db.SaveChangesAsync();
-
-                await _auditoria.RegistrarAsync(
-                    sensor.State ? "ACTIVAR_SENSOR" : "DESACTIVAR_SENSOR",
-                    sensor.Invernadero?.Nombre ?? "Sensores",
-                    $"Cambió estado del dispositivo '{sensor.CodigoDispositivo}' a {(sensor.State ? "Activo" : "Inactivo")}."
-                );
-
-                TempData["MensajeExito"] = $"Estado del sensor '{sensor.CodigoDispositivo}' actualizado.";
-            }
-
-            return RedirectToAction(nameof(Index));
+            TempData["MensajeExito"] = $"Dispositivo '{sensorNuevo.CodigoDispositivo}' vinculado a '{invernadero.Nombre}'.";
+            return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
         }
     }
 }
