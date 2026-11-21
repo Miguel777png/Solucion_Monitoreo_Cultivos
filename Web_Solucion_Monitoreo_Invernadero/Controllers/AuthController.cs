@@ -85,5 +85,13 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction(nameof(Login));
         }
+
+        [HttpGet]
+        [Authorize]
+        public IActionResult AccesoDenegado()
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return View();
+        }
     }
 }

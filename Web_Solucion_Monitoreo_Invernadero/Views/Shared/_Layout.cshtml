@@ -16,6 +16,7 @@
     var controladorActual = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
     var accionActual = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
     var inicialUsuario = string.IsNullOrWhiteSpace(nombreUsuario) ? "U" : nombreUsuario.Trim()[0].ToString().ToUpperInvariant();
+    var esAdministrador = User.IsInRole("Administrador");
 }
 <!DOCTYPE html>
 <html lang="es">
@@ -72,6 +73,14 @@
                 <a class="sidebar-link @(controladorActual == "Registros" && accionActual == "Auditoria" ? "active" : "")" asp-controller="Registros" asp-action="Auditoria">
                     <span class="sidebar-icon" aria-hidden="true">AU</span><span>Auditoría Usuarios</span>
                 </a>
+
+                @if (esAdministrador)
+                {
+                    <div class="sidebar-section-label sidebar-section-label--inside">ADMINISTRACIÓN</div>
+                    <a class="sidebar-link @(controladorActual == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
+                        <span class="sidebar-icon" aria-hidden="true">US</span><span>Gestionar Usuarios</span>
+                    </a>
+                }
             </nav>
 
             <div class="sidebar-user">
