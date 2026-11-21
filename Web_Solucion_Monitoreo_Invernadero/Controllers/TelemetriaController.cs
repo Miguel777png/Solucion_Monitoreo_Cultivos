@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
 using Web_Solucion_Monitoreo_Invernadero.Models;
@@ -45,6 +46,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
         // 1. ENDPOINT PARA LOS 3 ESP32: POST /api/telemetria
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> RecibirLectura([FromBody] LecturaSensorDto datos)
         {
             // Filtra por lista blanca: solo entran ESP32-ORQ-01, ESP32-ORQ-02 o ESP32-ORQ-03 activos

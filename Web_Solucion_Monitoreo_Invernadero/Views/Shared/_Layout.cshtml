@@ -1,9 +1,21 @@
-﻿@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Http
+@using System.Security.Claims
 @inject IHttpContextAccessor HttpContextAccessor
 @{
-    var idUsuario = HttpContextAccessor.HttpContext?.Session.GetInt32("IdUsuario");
-    var nombreUsuario = HttpContextAccessor.HttpContext?.Session.GetString("NombreUsuario") ?? "Administrador Principal (ID #1)";
-    var rolUsuario = HttpContextAccessor.HttpContext?.Session.GetString("RolUsuario") ?? "Administrador";
+    var estaAutenticado = User.Identity?.IsAuthenticated == true;
+    var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    int? idUsuario = int.TryParse(idClaim, out int idDesdeClaim)
+        ? idDesdeClaim
+        : HttpContextAccessor.HttpContext?.Session.GetInt32("IdUsuario");
+    var nombreUsuario = User.Identity?.Name
+        ?? HttpContextAccessor.HttpContext?.Session.GetString("NombreUsuario")
+        ?? "Usuario";
+    var rolUsuario = User.FindFirstValue(ClaimTypes.Role)
+        ?? HttpContextAccessor.HttpContext?.Session.GetString("RolUsuario")
+        ?? string.Empty;
+    var controladorActual = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var accionActual = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    var inicialUsuario = string.IsNullOrWhiteSpace(nombreUsuario) ? "U" : nombreUsuario.Trim()[0].ToString().ToUpperInvariant();
 }
 <!DOCTYPE html>
 <html lang="es">
@@ -16,66 +28,117 @@
     <link rel="stylesheet" href="~/Web_Solucion_Monitoreo_Invernadero.styles.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand fw-bold text-success" asp-controller="Monitoreo" asp-action="Index">
-                    Orquídeas IoT
+    <div class="app-shell">
+        @if (estaAutenticado)
+        {
+        <aside class="app-sidebar" id="app-sidebar" aria-label="Navegación principal">
+            <div class="sidebar-header">
+                <a class="sidebar-brand" asp-controller="Monitoreo" asp-action="Index">
+                    <span class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" role="img">
+                            <path d="M12 21c-1.2-4.7.1-9.4 4.1-13.4M12.5 17.3c2.2.4 4.4-.2 5.8-1.8 1.4-1.6 1.8-3.9 1.1-6-2.2-.1-4.3.8-5.6 2.5-1.2 1.5-1.7 3.4-1.3 5.3ZM10.9 13.5c-2.1.1-4.1-.8-5.3-2.4-1.2-1.6-1.5-3.8-.7-5.7 2.1 0 4 .9 5.2 2.5 1.1 1.6 1.4 3.6.8 5.6Z" />
+                        </svg>
+                    </span>
+                    <span>
+                        <strong>Orquídeas IoT</strong>
+                        <small>Control de invernaderos</small>
+                    </span>
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
-                        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+                <button class="sidebar-close d-lg-none" type="button" aria-label="Cerrar menú" data-sidebar-close>
+                    <span aria-hidden="true">&times;</span>
                 </button>
-                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark fw-semibold" asp-controller="Monitoreo" asp-action="Index">Monitor en Vivo</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Plantas" asp-action="Index">Catálogo Plantas</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Invernaderos" asp-action="Index">Invernaderos (1:1)</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Calendario" asp-action="Index">Calendario Riego</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Registros" asp-action="Historial">Historial Ambiental</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Registros" asp-action="Auditoria">Auditoría Usuarios</a>
-                        </li>
-                    </ul>
-
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-light text-dark border px-2 py-1">
-                            Usuario: <strong>@nombreUsuario</strong> @(idUsuario.HasValue ? $"(ID #{idUsuario})" : "")
-                        </span>
-                        <a class="btn btn-sm btn-outline-secondary" asp-controller="Auth" asp-action="Login">
-                            Cambiar Usuario
-                        </a>
-                    </div>
-                </div>
             </div>
-        </nav>
-    </header>
 
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+            <div class="sidebar-section-label">OPERACIÓN</div>
+            <nav class="sidebar-nav">
+                <a class="sidebar-link @(controladorActual == "Monitoreo" ? "active" : "")" asp-controller="Monitoreo" asp-action="Index">
+                    <span class="sidebar-icon" aria-hidden="true">MV</span><span>Monitor en Vivo</span>
+                </a>
+                <a class="sidebar-link @(controladorActual == "Plantas" ? "active" : "")" asp-controller="Plantas" asp-action="Index">
+                    <span class="sidebar-icon" aria-hidden="true">CP</span><span>Catálogo Plantas</span>
+                </a>
+                <a class="sidebar-link @(controladorActual == "Invernaderos" ? "active" : "")" asp-controller="Invernaderos" asp-action="Index">
+                    <span class="sidebar-icon" aria-hidden="true">IN</span><span>Invernaderos (1:1)</span>
+                </a>
+                <a class="sidebar-link @(controladorActual == "Calendario" ? "active" : "")" asp-controller="Calendario" asp-action="Index">
+                    <span class="sidebar-icon" aria-hidden="true">CR</span><span>Calendario Riego</span>
+                </a>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - Sistema de Monitoreo y Riego Automatizado de Orquídeas
+                <div class="sidebar-section-label sidebar-section-label--inside">REGISTROS</div>
+
+                <a class="sidebar-link @(controladorActual == "Registros" && accionActual != "Auditoria" ? "active" : "")" asp-controller="Registros" asp-action="Historial">
+                    <span class="sidebar-icon" aria-hidden="true">HA</span><span>Historial Ambiental</span>
+                </a>
+                <a class="sidebar-link @(controladorActual == "Registros" && accionActual == "Auditoria" ? "active" : "")" asp-controller="Registros" asp-action="Auditoria">
+                    <span class="sidebar-icon" aria-hidden="true">AU</span><span>Auditoría Usuarios</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-user">
+                <div class="user-avatar" aria-hidden="true">@inicialUsuario</div>
+                <div class="user-copy">
+                    <strong>@nombreUsuario</strong>
+                    <span>@rolUsuario @(idUsuario.HasValue ? $"· ID #{idUsuario}" : "")</span>
+                </div>
+                <form asp-controller="Auth" asp-action="Logout" method="post" class="m-0">
+                    <button class="user-switch" type="submit" title="Cerrar sesión">
+                        <span aria-hidden="true">⇥</span><span class="visually-hidden">Cerrar sesión</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <div class="sidebar-backdrop" data-sidebar-close></div>
+        }
+
+        <div class="app-content @(estaAutenticado ? "" : "app-content--public")">
+            @if (estaAutenticado)
+            {
+            <header class="mobile-header d-lg-none">
+                <button class="mobile-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" data-sidebar-open>
+                    <span aria-hidden="true">☰</span><span class="visually-hidden">Abrir menú</span>
+                </button>
+                <a class="mobile-brand" asp-controller="Monitoreo" asp-action="Index">Orquídeas IoT</a>
+                <span class="mobile-user" title="@nombreUsuario">@inicialUsuario</span>
+            </header>
+            }
+
+            <main role="main" class="app-main">
+                @RenderBody()
+            </main>
+
+            <footer class="app-footer text-muted">
+                &copy; 2026 - Sistema de Monitoreo y Riego Automatizado de Orquídeas
+            </footer>
         </div>
-    </footer>
+    </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        (() => {
+            const body = document.body;
+            const openButton = document.querySelector('[data-sidebar-open]');
+            const closeElements = document.querySelectorAll('[data-sidebar-close]');
+
+            const closeSidebar = () => {
+                body.classList.remove('sidebar-open');
+                openButton?.setAttribute('aria-expanded', 'false');
+            };
+
+            openButton?.addEventListener('click', () => {
+                body.classList.add('sidebar-open');
+                openButton.setAttribute('aria-expanded', 'true');
+            });
+
+            closeElements.forEach(element => element.addEventListener('click', closeSidebar));
+            document.querySelectorAll('.sidebar-link').forEach(link => link.addEventListener('click', closeSidebar));
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') closeSidebar();
+            });
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
