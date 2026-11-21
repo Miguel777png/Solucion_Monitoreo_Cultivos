@@ -1,10 +1,12 @@
-﻿using System.Text;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 using Web_Solucion_Monitoreo_Invernadero.Database;
+using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+    [VerificarAcceso] // Protege TODAS las acciones de este controlador (exige sesión iniciada)
     public class RegistrosController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -14,7 +16,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             _db = db;
         }
 
-        // 1. REGISTRO HISTÓRICO AMBIENTAL CON FILTROS
+        // 1. REGISTRO HISTÓRICO AMBIENTAL CON FILTROS (Acceso: Admin y Jardinero)
         public async Task<IActionResult> Historial(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
         {
             ViewBag.Invernaderos = await _db.Invernaderos
@@ -31,7 +33,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(registros);
         }
 
-        // ENDPOINT JSON EN VIVO PARA LA TABLA DE HISTORIAL
+        // ENDPOINT JSON EN VIVO PARA LA TABLA DE HISTORIAL (Acceso: Admin y Jardinero)
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> HistorialJson(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
@@ -73,7 +75,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .ToListAsync();
         }
 
-        // EXPORTACIÓN DIRECTA A CSV (EXCEL)
+        // EXPORTACIÓN DIRECTA A CSV (EXCEL) (Acceso: Admin y Jardinero)
         public async Task<IActionResult> ExportarCsv(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
         {
             var datos = await ConsultarHistorialAsync(idInvernadero, fechaDesde, fechaHasta, 5000);
@@ -90,7 +92,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return File(bytes, "text/csv", $"Historial_Invernaderos_{DateTime.Now:yyyyMMdd_HHmm}.csv");
         }
 
-        // 2. BITÁCORA COMPLETA DE RIEGOS Y ALERTAS CON FILTROS COMBINADOS
+        // 2. BITÁCORA COMPLETA DE RIEGOS Y ALERTAS CON FILTROS COMBINADOS (Acceso: Admin y Jardinero)
         public async Task<IActionResult> Bitacora(
             int? idInvernadero, string? tipoEvento, DateTime? fechaDesde, DateTime? fechaHasta)
         {
@@ -108,7 +110,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(eventos);
         }
 
-        // ENDPOINT JSON EN VIVO PARA LA TABLA DE BITÁCORA
+        // ENDPOINT JSON EN VIVO PARA LA TABLA DE BITÁCORA (Acceso: Admin y Jardinero)
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> BitacoraJson(
@@ -154,7 +156,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .ToListAsync();
         }
 
-        // 3. AUDITORÍA DE CAMBIOS POR USUARIO
+        // 3. AUDITORÍA DE CAMBIOS POR USUARIO (Acceso EXCLUSIVO: Administrador)
+        [VerificarAcceso(SoloAdministrador = true)]
         public async Task<IActionResult> Auditoria(int? idUsuario)
         {
             ViewBag.Usuarios = await _db.Usuarios

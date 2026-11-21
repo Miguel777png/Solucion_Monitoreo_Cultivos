@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
+using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+    [VerificarAcceso]
     public class MonitoreoController : Controller
     {
         private readonly ApplicationDbContext _db;

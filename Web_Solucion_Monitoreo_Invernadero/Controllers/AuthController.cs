@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
+using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+    [VerificarAcceso]
     public class AuthController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -14,22 +16,33 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login()
+        public async Task<IActionResult> Login()
         {
-            return View();
+            // Si ya tiene sesión iniciada, entra directo al Monitor
+            if (HttpContext.Session.GetInt32("IdUsuario").HasValue)
+            {
+                return RedirectToAction("Index", "Monitoreo");
+            }
+
+            var usuarios = await _db.Usuarios
+                .Where(u => u.State)
+                .OrderBy(u => u.IdUsuario)
+                .ToListAsync();
+
+            return View(usuarios);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(string email, string password)
+        public async Task<IActionResult> IniciarSesion(int idUsuario)
         {
             var usuario = await _db.Usuarios
-                .FirstOrDefaultAsync(u => u.Email == email && u.PasswordHash == password && u.State);
+                .FirstOrDefaultAsync(u => u.IdUsuario == idUsuario && u.State);
 
             if (usuario == null)
             {
-                ViewBag.Error = "Correo o contraseña incorrectos.";
-                return View();
+                TempData["MensajeError"] = "Usuario seleccionado no válido o inactivo.";
+                return RedirectToAction(nameof(Login));
             }
 
             HttpContext.Session.SetInt32("IdUsuario", usuario.IdUsuario);

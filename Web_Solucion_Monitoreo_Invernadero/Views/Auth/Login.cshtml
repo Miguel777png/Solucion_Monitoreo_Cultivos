@@ -1,41 +1,62 @@
-﻿@{
-    ViewData["Title"] = "Iniciar Sesión";
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Usuario>
+@{
+    ViewData["Title"] = "Iniciar Sesión - Orquídeas IoT";
+    Layout = null;
 }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+</head>
+<body class="bg-light d-flex align-items-center min-vh-100">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-success text-white text-center py-3">
+                        <h4 class="fw-bold mb-0">Orquídeas IoT</h4>
+                        <small>Sistema de Monitoreo y Riego Automatizado</small>
+                    </div>
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold text-dark mb-1">Control de Acceso</h5>
+                        <p class="text-muted small mb-3">
+                            Selecciona tu perfil operativo para registrar tu trazabilidad en el sistema.
+                        </p>
 
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-5">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-success text-white text-center py-3">
-                    <h4 class="mb-0 fw-bold">Acceso al Sistema IoT</h4>
-                    <small>Control de Invernaderos de Orquídeas</small>
-                </div>
-                <div class="card-body p-4">
-                    @if (ViewBag.Error != null)
-                    {
-                        <div class="alert alert-danger">@ViewBag.Error</div>
-                    }
+                        @if (TempData["MensajeError"] != null)
+                        {
+                            <div class="alert alert-danger small py-2">@TempData["MensajeError"]</div>
+                        }
 
-                    <form asp-action="Login" method="post">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Correo Electrónico</label>
-                            <input type="email" name="email" class="form-control" value="admin@invernadero.cl" required />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Contraseña</label>
-                            <input type="password" name="password" class="form-control" value="123456" required />
-                        </div>
-                        <button type="submit" class="btn btn-success w-100 fw-bold">Ingresar</button>
-                    </form>
+                        <form asp-action="IniciarSesion" method="post">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Perfil de Usuario</label>
+                                <select name="idUsuario" class="form-select" required>
+                                    @foreach (var u in Model)
+                                    {
+                                        <option value="@u.IdUsuario">
+                                            @u.Nombre — [@u.Rol]
+                                        </option>
+                                    }
+                                </select>
+                            </div>
 
-                    <hr />
-                    <div class="small text-muted">
-                        <strong>Cuentas disponibles en BD:</strong><br />
-                        • ID #1: <code>admin@invernadero.cl</code> (Clave: <code>123456</code>)<br />
-                        • ID #2: <code>operador@invernadero.cl</code> (Clave: <code>123456</code>)
+                            <div class="bg-light border rounded p-2 mb-3 small text-muted">
+                                <div><strong>Administrador:</strong> Gestión total (Invernaderos, Sensores, Auditoría y Riego).</div>
+                                <div class="mt-1"><strong>Jardinero:</strong> Monitoreo en vivo, Plantas, Asignación 1:1 y Calendario.</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                                Ingresar al Sistema
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</body>
+</html>

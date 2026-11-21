@@ -7,7 +7,7 @@
     var sensorActual = Model?.Sensores.FirstOrDefault();
 }
 
-<div class="container py-3">
+<div class="container py-3" id="monitor-app" data-invernadero-id ="@idActual">
     <!-- 1. TARJETAS SUPERIORES DE LOS 3 INVERNADEROS (SELECCIÓN RÁPIDA EN VIVO) -->
     <div class="row g-3 mb-4">
         @foreach (var inv in todos)
@@ -150,9 +150,4 @@
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="~/js/monitoreo.js" asp-append-version="true"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            iniciarMonitor(@idActual);
-        });
-    </script>
 }

@@ -135,3 +135,11 @@ function iniciarMonitor(idInvernadero) {
         if (reloj) reloj.textContent = new Date().toLocaleTimeString();
     }, 1000);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const contenedor = document.getElementById('monitor-app');
+    if (contenedor) {
+        const idInv = Number(contenedor.dataset.invernaderoId || 1);
+        iniciarMonitor(idInv);
+    }
+});

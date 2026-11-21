@@ -183,12 +183,18 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             });
         }
 
-        // 3. ENDPOINT GLOBAL PARA LAS 3 TARJETAS DEL DASHBOARD: GET /api/telemetria/resumen-todos
+        // 3. ENDPOINT GLOBAL DINÁMICO PARA N INVERNADEROS: GET /api/telemetria/resumen-todos
         [HttpGet("resumen-todos")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-        public IActionResult ObtenerResumenTodos()
+        public async Task<IActionResult> ObtenerResumenTodos()
         {
-            var resumen = new[] { 1, 2, 3 }.Select(id =>
+            var idsActivos = await _db.Invernaderos
+                .Where(i => i.State)
+                .OrderBy(i => i.IdInvernadero)
+                .Select(i => i.IdInvernadero)
+                .ToListAsync();
+
+            var resumen = idsActivos.Select(id =>
             {
                 var est = _ram.ObtenerOCrear(id);
                 return new
@@ -202,5 +208,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             return Ok(resumen);
         }
+
+
     }
 }

@@ -1,41 +1,42 @@
 ﻿@using Microsoft.AspNetCore.Http
-@inject IHttpContextAccessor HttpContextAccessor
 @{
-    var idUsuario = HttpContextAccessor.HttpContext?.Session.GetInt32("IdUsuario");
-    var nombreUsuario = HttpContextAccessor.HttpContext?.Session.GetString("NombreUsuario") ?? "Administrador Principal (ID #1)";
-    var rolUsuario = HttpContextAccessor.HttpContext?.Session.GetString("RolUsuario") ?? "Administrador";
+    int? idUser = Context.Session.GetInt32("IdUsuario");
+    string nombreUser = Context.Session.GetString("NombreUsuario") ?? "Sin sesión";
+    string rolUser = Context.Session.GetString("RolUsuario") ?? "";
+    bool esAdmin = rolUser.Equals("Administrador", StringComparison.OrdinalIgnoreCase);
 }
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Monitoreo Invernaderos IoT</title>
+    <title>@ViewData["Title"] - Orquídeas IoT</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/Web_Solucion_Monitoreo_Invernadero.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body class="bg-light d-flex flex-column min-vh-100">
     <header>
-        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+            <div class="container">
                 <a class="navbar-brand fw-bold text-success" asp-controller="Monitoreo" asp-action="Index">
                     Orquídeas IoT
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
-                        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+
+                <div class="collapse navbar-collapse" id="navbarMain">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link text-dark fw-semibold" asp-controller="Monitoreo" asp-action="Index">Monitor en Vivo</a>
+                            <a class="nav-link text-dark" asp-controller="Monitoreo" asp-action="Index">Monitor en Vivo</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-controller="Plantas" asp-action="Index">Catálogo Plantas</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Invernaderos" asp-action="Index">Invernaderos (1:1)</a>
+                            <a class="nav-link text-dark" asp-controller="Invernaderos" asp-action="Index">
+                                @(esAdmin ? "Invernaderos y Sensores" : "Invernaderos (1:1)")
+                            </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-controller="Calendario" asp-action="Index">Calendario Riego</a>
@@ -43,17 +44,21 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-controller="Registros" asp-action="Historial">Historial Ambiental</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Registros" asp-action="Auditoria">Auditoría Usuarios</a>
-                        </li>
+                        @if (esAdmin)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark fw-semibold" asp-controller="Registros" asp-action="Auditoria">Auditoría Usuarios</a>
+                            </li>
+                        }
                     </ul>
 
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-light text-dark border px-2 py-1">
-                            Usuario: <strong>@nombreUsuario</strong> @(idUsuario.HasValue ? $"(ID #{idUsuario})" : "")
+                        <span class="badge bg-light text-dark border py-2 px-3">
+                            @nombreUser
+                            <span class="badge @(esAdmin ? "bg-danger" : "bg-success") ms-1">@rolUser</span>
                         </span>
-                        <a class="btn btn-sm btn-outline-secondary" asp-controller="Auth" asp-action="Login">
-                            Cambiar Usuario
+                        <a asp-controller="Auth" asp-action="Logout" class="btn btn-outline-danger btn-sm">
+                            Cerrar Sesión
                         </a>
                     </div>
                 </div>
@@ -61,21 +66,18 @@
         </nav>
     </header>
 
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+    <main role="main" class="flex-grow-1 pb-4">
+        @RenderBody()
+    </main>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
+    <footer class="border-top footer text-muted bg-white py-3 mt-auto">
+        <div class="container small text-center">
             &copy; 2026 - Sistema de Monitoreo y Riego Automatizado de Orquídeas
         </div>
     </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

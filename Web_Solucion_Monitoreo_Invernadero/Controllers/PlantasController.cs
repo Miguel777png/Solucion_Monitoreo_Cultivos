@@ -1,12 +1,14 @@
-﻿using System.Globalization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using Web_Solucion_Monitoreo_Invernadero.Database;
+using Web_Solucion_Monitoreo_Invernadero.Filters;
 using Web_Solucion_Monitoreo_Invernadero.Models;
 using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+    [VerificarAcceso]
     public class PlantasController : Controller
     {
         private readonly ApplicationDbContext _db;
