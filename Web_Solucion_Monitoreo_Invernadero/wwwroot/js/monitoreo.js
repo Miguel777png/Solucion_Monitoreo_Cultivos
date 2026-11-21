@@ -39,8 +39,77 @@ function inicializarGrafica() {
     });
 }
 
+function obtenerFavoritos() {
+    try {
+        return JSON.parse(localStorage.getItem('orquideas_inv_favoritos') || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function alternarFavorito(id) {
+    let favs = obtenerFavoritos();
+    if (favs.includes(id)) {
+        favs = favs.filter(x => x !== id);
+    } else {
+        favs.push(id);
+    }
+    localStorage.setItem('orquideas_inv_favoritos', JSON.stringify(favs));
+    actualizarEstrellasFavoritos();
+    aplicarFiltroTarjetas();
+}
+
+function actualizarEstrellasFavoritos() {
+    const favs = obtenerFavoritos();
+    document.querySelectorAll('.btn-favorito-inv').forEach(btn => {
+        const id = Number(btn.dataset.id);
+        const esFav = favs.includes(id);
+        btn.textContent = esFav ? '★' : '☆';
+        btn.classList.toggle('text-warning', esFav);
+        btn.classList.toggle('text-muted', !esFav);
+    });
+}
+
+function aplicarFiltroTarjetas() {
+    const texto = (document.getElementById('filtro-buscar-inv')?.value || '').trim().toLowerCase();
+    const modo = document.getElementById('filtro-cantidad-inv')?.value || 'all';
+    const favs = obtenerFavoritos();
+    const tarjetas = Array.from(document.querySelectorAll('.tarjeta-inv-item'));
+
+    let visibles = 0;
+
+    tarjetas.forEach(card => {
+        const id = Number(card.dataset.id);
+        const searchData = card.dataset.search || '';
+        const conectado = card.dataset.conectado === 'true';
+
+        let coincideTexto = !texto || searchData.includes(texto);
+        let coincideModo = true;
+
+        if (modo === 'online') {
+            coincideModo = conectado;
+        } else if (modo === 'favoritos') {
+            coincideModo = favs.includes(id);
+        } else if (modo === '3' || modo === '6') {
+            const limite = Number(modo);
+            coincideModo = visibles < limite;
+        }
+
+        if (coincideTexto && coincideModo) {
+            card.classList.remove('d-none');
+            visibles++;
+        } else {
+            card.classList.add('d-none');
+        }
+    });
+
+    const contador = document.getElementById('contador-visibles');
+    if (contador) contador.textContent = visibles;
+}
+
 async function actualizarDashboard(idInvernadero) {
     try {
+        // 1. Datos en vivo del invernadero principal seleccionado
         const resp = await fetch(`/api/telemetria/actual/${idInvernadero}`);
         if (resp.ok) {
             const data = await resp.json();
@@ -72,6 +141,7 @@ async function actualizarDashboard(idInvernadero) {
             }
         }
 
+        // 2. Resumen dinámico de N invernaderos
         const respResumen = await fetch('/api/telemetria/resumen-todos');
         if (respResumen.ok) {
             const lista = await respResumen.json();
@@ -79,6 +149,11 @@ async function actualizarDashboard(idInvernadero) {
                 const mBadge = document.getElementById(`mini-badge-${item.idInvernadero}`);
                 const mHum = document.getElementById(`mini-hum-${item.idInvernadero}`);
                 const mTemp = document.getElementById(`mini-temp-${item.idInvernadero}`);
+                const cardWrapper = document.querySelector(`.tarjeta-inv-item[data-id="${item.idInvernadero}"]`);
+
+                if (cardWrapper) {
+                    cardWrapper.dataset.conectado = item.conectado ? 'true' : 'false';
+                }
 
                 if (mBadge) {
                     mBadge.className = item.conectado ? 'badge bg-success' : 'badge bg-secondary';
@@ -87,11 +162,11 @@ async function actualizarDashboard(idInvernadero) {
                 if (mHum) mHum.textContent = item.conectado ? `${Number(item.humedad).toFixed(1)} %` : '-- %';
                 if (mTemp) mTemp.textContent = item.conectado ? `${Number(item.temperatura).toFixed(1)} °C` : '-- °C';
             });
+
+            aplicarFiltroTarjetas();
         }
 
-
-
-        // 3. Actualizamos la lista de eventos/alertas sin F5
+        // 3. Lista de eventos/alertas en vivo sin F5
         const respAlertas = await fetch(`/api/telemetria/alertas/${idInvernadero}`);
         if (respAlertas.ok) {
             const alertas = await respAlertas.json();
@@ -118,9 +193,6 @@ async function actualizarDashboard(idInvernadero) {
                 }
             }
         }
-
-
-
     } catch (err) {
         console.error('Error consultando telemetría:', err);
     }
@@ -128,7 +200,10 @@ async function actualizarDashboard(idInvernadero) {
 
 function iniciarMonitor(idInvernadero) {
     inicializarGrafica();
+    actualizarEstrellasFavoritos();
+    aplicarFiltroTarjetas();
     actualizarDashboard(idInvernadero);
+
     setInterval(() => actualizarDashboard(idInvernadero), 2000);
     setInterval(() => {
         const reloj = document.getElementById('reloj-actual');
@@ -141,5 +216,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (contenedor) {
         const idInv = Number(contenedor.dataset.invernaderoId || 1);
         iniciarMonitor(idInv);
+
+        document.getElementById('filtro-buscar-inv')?.addEventListener('input', aplicarFiltroTarjetas);
+        document.getElementById('filtro-cantidad-inv')?.addEventListener('change', aplicarFiltroTarjetas);
+
+        document.querySelectorAll('.btn-favorito-inv').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                alternarFavorito(Number(btn.dataset.id));
+            });
+        });
     }
 });
