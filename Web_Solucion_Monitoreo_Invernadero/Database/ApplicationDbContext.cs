@@ -20,14 +20,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Database
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<Usuario>()
-                .HasIndex(u => u.Nombre)
-                .IsUnique();
-
-            modelBuilder.Entity<Usuario>()
-                .HasIndex(u => u.Email)
-                .IsUnique();
-
             // Relación estricta 1:1 -> Cada planta pertenece como máximo a un único invernadero
             modelBuilder.Entity<Invernadero>()
                 .HasOne(i => i.Planta)

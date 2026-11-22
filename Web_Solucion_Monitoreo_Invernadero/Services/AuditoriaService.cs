@@ -1,5 +1,4 @@
 ﻿using Web_Solucion_Monitoreo_Invernadero.Database;
-using System.Security.Claims;
 using Web_Solucion_Monitoreo_Invernadero.Models;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Services
@@ -18,24 +17,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         // Devuelve el ID del usuario logueado (por defecto 1 si aún no inició sesión)
         public int ObtenerIdUsuarioActual()
         {
-            var httpContext = _http.HttpContext;
-            var idClaim = httpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (int.TryParse(idClaim, out int idUsuario))
-            {
-                return idUsuario;
-            }
-
-            return httpContext?.Session.GetInt32("IdUsuario")
-                ?? throw new InvalidOperationException("No existe un usuario autenticado para registrar la auditoría.");
+            return _http.HttpContext?.Session.GetInt32("IdUsuario") ?? 1;
         }
 
         public string ObtenerNombreUsuarioActual()
         {
-            var httpContext = _http.HttpContext;
-            return httpContext?.User.Identity?.Name
-                ?? httpContext?.Session.GetString("NombreUsuario")
-                ?? "Usuario autenticado";
+            return _http.HttpContext?.Session.GetString("NombreUsuario") ?? "Administrador Principal";
         }
 
         public async Task RegistrarAsync(string accion, string entidadAfectada, string detalle)

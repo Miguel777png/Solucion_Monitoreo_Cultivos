@@ -1,157 +1,84 @@
-@using Microsoft.AspNetCore.Http
-@using System.Security.Claims
-@inject IHttpContextAccessor HttpContextAccessor
+﻿@using Microsoft.AspNetCore.Http
 @{
-    var estaAutenticado = User.Identity?.IsAuthenticated == true
-        || HttpContextAccessor.HttpContext?.Session.GetInt32("IdUsuario").HasValue == true;
-    var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    int? idUsuario = int.TryParse(idClaim, out int idDesdeClaim)
-        ? idDesdeClaim
-        : HttpContextAccessor.HttpContext?.Session.GetInt32("IdUsuario");
-    var nombreUsuario = User.Identity?.Name
-        ?? HttpContextAccessor.HttpContext?.Session.GetString("NombreUsuario")
-        ?? "Usuario";
-    var rolUsuario = User.FindFirstValue(ClaimTypes.Role)
-        ?? HttpContextAccessor.HttpContext?.Session.GetString("RolUsuario")
-        ?? string.Empty;
-    var controladorActual = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
-    var accionActual = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
-    var inicialUsuario = string.IsNullOrWhiteSpace(nombreUsuario) ? "U" : nombreUsuario.Trim()[0].ToString().ToUpperInvariant();
-    var esAdministrador = User.IsInRole("Administrador");
+    int? idUser = Context.Session.GetInt32("IdUsuario");
+    string nombreUser = Context.Session.GetString("NombreUsuario") ?? "Sin sesión";
+    string rolUser = Context.Session.GetString("RolUsuario") ?? "";
+    bool esAdmin = rolUser.Equals("Administrador", StringComparison.OrdinalIgnoreCase);
 }
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Monitoreo Invernaderos IoT</title>
+    <title>@ViewData["Title"] - Orquídeas IoT</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/Web_Solucion_Monitoreo_Invernadero.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <div class="app-shell">
-        @if (estaAutenticado)
-        {
-        <aside class="app-sidebar" id="app-sidebar" aria-label="Navegación principal">
-            <div class="sidebar-header">
-                <a class="sidebar-brand" asp-controller="Monitoreo" asp-action="Index">
-                    <span class="brand-mark" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" role="img">
-                            <path d="M12 21c-1.2-4.7.1-9.4 4.1-13.4M12.5 17.3c2.2.4 4.4-.2 5.8-1.8 1.4-1.6 1.8-3.9 1.1-6-2.2-.1-4.3.8-5.6 2.5-1.2 1.5-1.7 3.4-1.3 5.3ZM10.9 13.5c-2.1.1-4.1-.8-5.3-2.4-1.2-1.6-1.5-3.8-.7-5.7 2.1 0 4 .9 5.2 2.5 1.1 1.6 1.4 3.6.8 5.6Z" />
-                        </svg>
-                    </span>
-                    <span>
-                        <strong>Orquídeas IoT</strong>
-                        <small>Control de invernaderos</small>
-                    </span>
+<body class="bg-light d-flex flex-column min-vh-100">
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+            <div class="container">
+                <a class="navbar-brand fw-bold text-success" asp-controller="Monitoreo" asp-action="Index">
+                    Orquídeas IoT
                 </a>
-                <button class="sidebar-close d-lg-none" type="button" aria-label="Cerrar menú" data-sidebar-close>
-                    <span aria-hidden="true">&times;</span>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+                    <span class="navbar-toggler-icon"></span>
                 </button>
-            </div>
 
-            <div class="sidebar-section-label">OPERACIÓN</div>
-            <nav class="sidebar-nav">
-                <a class="sidebar-link @(controladorActual == "Monitoreo" ? "active" : "")" asp-controller="Monitoreo" asp-action="Index">
-                    <span class="sidebar-icon" aria-hidden="true">MV</span><span>Monitor en Vivo</span>
-                </a>
-                <a class="sidebar-link @(controladorActual == "Plantas" ? "active" : "")" asp-controller="Plantas" asp-action="Index">
-                    <span class="sidebar-icon" aria-hidden="true">CP</span><span>Catálogo Plantas</span>
-                </a>
-                <a class="sidebar-link @(controladorActual == "Invernaderos" ? "active" : "")" asp-controller="Invernaderos" asp-action="Index">
-                    <span class="sidebar-icon" aria-hidden="true">IN</span><span>Invernaderos (1:1)</span>
-                </a>
-                <a class="sidebar-link @(controladorActual == "Calendario" ? "active" : "")" asp-controller="Calendario" asp-action="Index">
-                    <span class="sidebar-icon" aria-hidden="true">CR</span><span>Calendario Riego</span>
-                </a>
+                <div class="collapse navbar-collapse" id="navbarMain">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Monitoreo" asp-action="Index">Monitor en Vivo</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Plantas" asp-action="Index">Catálogo Plantas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Invernaderos" asp-action="Index">Invernaderos </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Calendario" asp-action="Index">Calendario Riego</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Registros" asp-action="Historial">Historial Ambiental</a>
+                        </li>
+                        @if (esAdmin)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark fw-semibold" asp-controller="Sensores" asp-action="Index">Sensores IoT</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark fw-semibold" asp-controller="Registros" asp-action="Auditoria">Auditoría Usuarios</a>
+                            </li>
+                        }
+                    </ul>
 
-                <div class="sidebar-section-label sidebar-section-label--inside">REGISTROS</div>
-
-                <a class="sidebar-link @(controladorActual == "Registros" && accionActual != "Auditoria" ? "active" : "")" asp-controller="Registros" asp-action="Historial">
-                    <span class="sidebar-icon" aria-hidden="true">HA</span><span>Historial Ambiental</span>
-                </a>
-                <a class="sidebar-link @(controladorActual == "Registros" && accionActual == "Auditoria" ? "active" : "")" asp-controller="Registros" asp-action="Auditoria">
-                    <span class="sidebar-icon" aria-hidden="true">AU</span><span>Auditoría Usuarios</span>
-                </a>
-
-                @if (esAdministrador)
-                {
-                    <div class="sidebar-section-label sidebar-section-label--inside">ADMINISTRACIÓN</div>
-                    <a class="sidebar-link @(controladorActual == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
-                        <span class="sidebar-icon" aria-hidden="true">US</span><span>Gestionar Usuarios</span>
-                    </a>
-                    <a class="sidebar-link @(controladorActual == "Sensores" ? "active" : "")" asp-controller="Sensores" asp-action="Index">
-                        <span class="sidebar-icon" aria-hidden="true">SI</span><span>Sensores IoT</span>
-                    </a>
-                }
-            </nav>
-
-            <div class="sidebar-user">
-                <div class="user-avatar" aria-hidden="true">@inicialUsuario</div>
-                <div class="user-copy">
-                    <strong>@nombreUsuario</strong>
-                    <span>@rolUsuario @(idUsuario.HasValue ? $"· ID #{idUsuario}" : "")</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-dark border py-2 px-3">
+                            @nombreUser
+                            <span class="badge @(esAdmin ? "bg-danger" : "bg-success") ms-1">@rolUser</span>
+                        </span>
+                        <a asp-controller="Auth" asp-action="Logout" class="btn btn-outline-danger btn-sm">
+                            Cerrar Sesión
+                        </a>
+                    </div>
                 </div>
-                <form asp-controller="Auth" asp-action="Logout" method="post" class="m-0">
-                    <button class="user-switch" type="submit" title="Cerrar sesión">
-                        <span aria-hidden="true">⇥</span><span class="visually-hidden">Cerrar sesión</span>
-                    </button>
-                </form>
             </div>
-        </aside>
+        </nav>
+    </header>
 
-        <div class="sidebar-backdrop" data-sidebar-close></div>
-        }
+    <main role="main" class="flex-grow-1 pb-4">
+        @RenderBody()
+    </main>
 
-        <div class="app-content @(estaAutenticado ? "" : "app-content--public")">
-            @if (estaAutenticado)
-            {
-            <header class="mobile-header d-lg-none">
-                <button class="mobile-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" data-sidebar-open>
-                    <span aria-hidden="true">☰</span><span class="visually-hidden">Abrir menú</span>
-                </button>
-                <a class="mobile-brand" asp-controller="Monitoreo" asp-action="Index">Orquídeas IoT</a>
-                <span class="mobile-user" title="@nombreUsuario">@inicialUsuario</span>
-            </header>
-            }
-
-            <main role="main" class="app-main">
-                @RenderBody()
-            </main>
-
-            <footer class="app-footer text-muted">
-                &copy; 2026 - Sistema de Monitoreo y Riego Automatizado de Orquídeas
-            </footer>
+    <footer class="border-top footer text-muted bg-white py-3 mt-auto">
+        <div class="container small text-center">
+            &copy; 2026 - Sistema de Monitoreo y Riego Automatizado de Orquídeas
         </div>
-    </div>
+    </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    <script>
-        (() => {
-            const body = document.body;
-            const openButton = document.querySelector('[data-sidebar-open]');
-            const closeElements = document.querySelectorAll('[data-sidebar-close]');
-
-            const closeSidebar = () => {
-                body.classList.remove('sidebar-open');
-                openButton?.setAttribute('aria-expanded', 'false');
-            };
-
-            openButton?.addEventListener('click', () => {
-                body.classList.add('sidebar-open');
-                openButton.setAttribute('aria-expanded', 'true');
-            });
-
-            closeElements.forEach(element => element.addEventListener('click', closeSidebar));
-            document.querySelectorAll('.sidebar-link').forEach(link => link.addEventListener('click', closeSidebar));
-            document.addEventListener('keydown', event => {
-                if (event.key === 'Escape') closeSidebar();
-            });
-        })();
-    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
