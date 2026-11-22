@@ -21,7 +21,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         [AllowAnonymous]
         public IActionResult Login()
         {
-            if (User.Identity?.IsAuthenticated == true)
+            if (User.Identity?.IsAuthenticated == true || HttpContext.Session.GetInt32("IdUsuario").HasValue)
             {
                 return RedirectToAction("Index", "Monitoreo");
             }
@@ -32,20 +32,30 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(string email, string password)
+        public async Task<IActionResult> IniciarSesion(string correo, string password)
         {
             if (User.Identity?.IsAuthenticated == true)
             {
                 return RedirectToAction("Index", "Monitoreo");
             }
 
+            if (string.IsNullOrWhiteSpace(correo) || string.IsNullOrWhiteSpace(password))
+            {
+                TempData["MensajeError"] = "Debe ingresar su correo y contraseña.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            string correoLimpio = correo.Trim().ToLower();
+
             var usuario = await _db.Usuarios
-                .FirstOrDefaultAsync(u => u.Email == email && u.PasswordHash == password && u.State);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == correoLimpio
+                                       && u.PasswordHash == password
+                                       && u.State);
 
             if (usuario == null)
             {
-                ViewBag.Error = "Correo o contraseña incorrectos.";
-                return View();
+                TempData["MensajeError"] = "Correo o contraseña incorrectos, o usuario inactivo.";
+                return RedirectToAction(nameof(Login));
             }
 
             HttpContext.Session.SetInt32("IdUsuario", usuario.IdUsuario);

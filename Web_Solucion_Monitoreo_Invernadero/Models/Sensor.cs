@@ -11,9 +11,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         [Column("id_sensor")]
         public int IdSensor { get; set; }
 
-        [Required]
         [Column("id_invernadero")]
-        public int IdInvernadero { get; set; }
+        public int? IdInvernadero { get; set; }
 
         [Required(ErrorMessage = "El código del dispositivo es obligatorio")]
         [StringLength(50)]

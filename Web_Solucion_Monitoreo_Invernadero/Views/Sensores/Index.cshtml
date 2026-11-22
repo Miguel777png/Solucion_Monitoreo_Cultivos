@@ -1,0 +1,174 @@
+﻿@model List<Web_Solucion_Monitoreo_Invernadero.Models.Sensor>
+@{
+    ViewData["Title"] = "Sensores IoT (Lista Blanca)";
+    var todosInvernaderos = ViewBag.Invernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    var invernaderosLibres = ViewBag.InvernaderosLibres as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
+    string? busqueda = ViewBag.Busqueda;
+    string? estadoFiltro = ViewBag.EstadoFiltro;
+}
+
+<div class="container py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="fw-bold text-primary mb-0">Registro de Sensores ESP32 (Lista Blanca)</h2>
+            <small class="text-muted">Solo los códigos de hardware activos aquí pueden enviar telemetría al servidor (1 asignado por sector).</small>
+        </div>
+        <span class="badge bg-danger fs-6">Exclusivo Administrador</span>
+    </div>
+
+    @if (TempData["MensajeExito"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["MensajeExito"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["MensajeError"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["MensajeError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <!-- Alta de Nuevo Código Permitido -->
+        <div class="col-lg-4">
+            <div class="card border-primary shadow-sm">
+                <div class="card-header bg-primary text-white fw-bold">+ Autorizar Nuevo ESP32</div>
+                <div class="card-body">
+                    <form asp-action="Registrar" method="post">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Código de Dispositivo (Hardware ID)</label>
+                            <input type="text" name="codigoDispositivo" class="form-control text-uppercase"
+                                   placeholder="Ej: ESP32-ORQ-04" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Nombre Descriptivo del Nodo</label>
+                            <input type="text" name="nombreNodo" class="form-control"
+                                   placeholder="Ej: Nodo DHT22 + Relé Sector Este" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Invernadero Inicial (Libres)</label>
+                            <select name="idInvernadero" class="form-select">
+                                <option value="">-- Dejar Disponible (Sin asignar) --</option>
+                                @foreach (var inv in invernaderosLibres)
+                                {
+                                    <option value="@inv.IdInvernadero">@inv.Nombre (Libre)</option>
+                                }
+                            </select>
+                            @if (!invernaderosLibres.Any())
+                            {
+                                <div class="form-text small text-muted">
+                                    Todos los invernaderos actuales ya tienen sensor; el dispositivo quedará en estado <strong>Disponible</strong>.
+                                </div>
+                            }
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">
+                            Registrar en Lista Blanca
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Sensores Registrados -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span class="fw-bold">Dispositivos Autorizados (@Model.Count)</span>
+                        <form method="get" class="d-flex gap-2">
+                            <input type="text" name="busqueda" value="@busqueda"
+                                   class="form-control form-control-sm" style="width: 165px;"
+                                   placeholder="Buscar código/nodo..." />
+                            <select name="estadoFiltro" class="form-select form-select-sm" style="width: 145px;">
+                                <option value="">Todos</option>
+                                <option value="disponible" selected="@(estadoFiltro == "disponible")">Disponibles</option>
+                                <option value="asignado" selected="@(estadoFiltro == "asignado")">Asignados</option>
+                                <option value="inactivo" selected="@(estadoFiltro == "inactivo")">Inactivos</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                            @if (!string.IsNullOrWhiteSpace(busqueda) || !string.IsNullOrWhiteSpace(estadoFiltro))
+                            {
+                                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                            }
+                        </form>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Código</th>
+                                <th>Nodo</th>
+                                <th>Invernadero Asignado</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!Model.Any())
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No hay sensores con ese filtro.</td>
+                                </tr>
+                            }
+                            @foreach (var s in Model)
+                            {
+                                <tr>
+                                    <td><code class="fw-bold fs-6">@s.CodigoDispositivo</code></td>
+                                    <td class="small">@s.NombreNodo</td>
+                                    <td>
+                                        <form asp-action="CambiarAsignacion" method="post" class="d-flex gap-1">
+                                            <input type="hidden" name="idSensor" value="@s.IdSensor" />
+                                            <select name="idInvernadero" class="form-select form-select-sm" style="width: 210px;">
+                                                <option value="">-- Disponible (Liberar) --</option>
+                                                @foreach (var inv in todosInvernaderos)
+                                                {
+                                                    var ocupante = inv.Sensores.FirstOrDefault();
+                                                    bool esElMismo = s.IdInvernadero == inv.IdInvernadero;
+                                                    bool ocupadoPorOtro = ocupante != null && !esElMismo;
+
+                                                    <option value="@inv.IdInvernadero"
+                                                            selected="@esElMismo"
+                                                            disabled="@ocupadoPorOtro">
+                                                        @(ocupadoPorOtro ? $"{inv.Nombre} (Ocupado: {ocupante!.CodigoDispositivo})" : inv.Nombre)
+                                                    </option>
+                                                }
+                                            </select>
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">Mover</button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        @if (!s.State)
+                                        {
+                                            <span class="badge bg-secondary">Inactivo</span>
+                                        }
+                                        else if (s.IdInvernadero == null)
+                                        {
+                                            <span class="badge bg-info text-dark">Disponible</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Activo</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <form asp-action="AlternarEstado" method="post" class="d-inline">
+                                            <input type="hidden" name="idSensor" value="@s.IdSensor" />
+                                            <button type="submit" class="btn btn-sm @(s.State ? "btn-outline-danger" : "btn-outline-success")">
+                                                @(s.State ? "Desactivar" : "Activar")
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

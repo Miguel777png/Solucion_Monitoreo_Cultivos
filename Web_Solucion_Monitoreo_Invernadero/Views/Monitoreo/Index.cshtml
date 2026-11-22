@@ -1,49 +1,96 @@
 ﻿@model Web_Solucion_Monitoreo_Invernadero.Models.Invernadero
 @{
-    ViewData["Title"] = "Monitor en Vivo - 3 Invernaderos";
+    ViewData["Title"] = "Monitor en Vivo Multi-Invernadero";
     var todos = ViewBag.TodosInvernaderos as List<Web_Solucion_Monitoreo_Invernadero.Models.Invernadero> ?? new();
     var alertas = ViewBag.UltimasAlertas as List<Web_Solucion_Monitoreo_Invernadero.Models.BitacoraRiegoAlerta> ?? new();
     int idActual = Model?.IdInvernadero ?? 1;
-    var sensorActual = Model?.Sensores.FirstOrDefault();
+    var sensorActual = Model?.Sensores.FirstOrDefault(s => s.State) ?? Model?.Sensores.FirstOrDefault();
+
+    decimal hMin = Model?.Planta?.HumedadMinima ?? 0;
+    decimal hMax = Model?.Planta?.HumedadMaxima ?? 0;
+    decimal hOptimaCalculada = (hMin + hMax) / 2m;
 }
 
-<div class="container py-3">
-    <!-- 1. TARJETAS SUPERIORES DE LOS 3 INVERNADEROS (SELECCIÓN RÁPIDA EN VIVO) -->
-    <div class="row g-3 mb-4">
+<div id="monitor-app" data-invernadero-id="@idActual" class="container py-3">
+    <!-- 0. BARRA DE CONTROL DE VISTA MULTI-INVERNADERO -->
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body py-2 px-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-4">
+                    <span class="fw-bold text-dark small">
+                        Panel de Sectores Activos (<span id="contador-visibles">@todos.Count</span> de @todos.Count)
+                    </span>
+                </div>
+                <div class="col-md-4">
+                    <input type="text" id="filtro-buscar-inv" class="form-control form-control-sm"
+                           placeholder="Buscar por sector, planta o ESP32..." />
+                </div>
+                <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+                    <select id="filtro-cantidad-inv" class="form-select form-select-sm" style="max-width: 210px;">
+                        <option value="all" selected>Mostrar: Todos (@todos.Count)</option>
+                        <option value="3">Mostrar: Primeros 3</option>
+                        <option value="6">Mostrar: Primeros 6</option>
+                        <option value="online">Solo En Vivo (Conectados)</option>
+                        <option value="favoritos">Solo Fijados (★)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. TARJETAS SUPERIORES DE LOS INVERNADEROS (SELECCIÓN RÁPIDA EN VIVO) -->
+    <div id="contenedor-tarjetas-inv" class="row g-3 mb-4">
         @foreach (var inv in todos)
         {
             bool esSeleccionado = inv.IdInvernadero == idActual;
-            var s = inv.Sensores.FirstOrDefault();
+            var s = inv.Sensores.FirstOrDefault(x => x.State) ?? inv.Sensores.FirstOrDefault();
+            string textoBusqueda = $"{inv.Nombre} {inv.Planta?.Nombre} {s?.CodigoDispositivo}".ToLower();
 
-            <div class="col-md-4">
-                <a asp-controller="Monitoreo" asp-action="Index" asp-route-idInvernadero="@inv.IdInvernadero"
-                   class="text-decoration-none">
-                    <div class="card shadow-sm h-100 @(esSeleccionado ? "border-success border-3 bg-light" : "border-0")">
-                        <div class="card-body py-2 px-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold text-dark">@inv.Nombre</span>
+            <div class="col-md-4 tarjeta-inv-item"
+                 data-id="@inv.IdInvernadero"
+                 data-search="@textoBusqueda"
+                 data-conectado="false">
+                <div class="card shadow-sm h-100 @(esSeleccionado ? "border-success border-3 bg-light" : "border-0")">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <a asp-controller="Monitoreo" asp-action="Index" asp-route-idInvernadero="@inv.IdInvernadero"
+                               class="fw-bold text-dark text-decoration-none stretched-link">
+                                <span id="mini-salud-@inv.IdInvernadero" class="me-1" title="Estado de la planta">•</span>@inv.Nombre
+                            </a>
+                            <div class="d-flex align-items-center gap-1 position-relative" style="z-index: 2;">
+                                <button type="button"
+                                        class="btn btn-sm btn-link p-0 text-decoration-none btn-favorito-inv"
+                                        data-id="@inv.IdInvernadero"
+                                        title="Fijar en vista rápida">
+                                    ☆
+                                </button>
                                 <span id="mini-badge-@inv.IdInvernadero" class="badge bg-secondary">Esperando...</span>
                             </div>
-                            <div class="small text-muted mb-2">
-                                Planta: <strong class="text-success">@inv.Planta?.Nombre</strong> · Nodo: <code>@s?.CodigoDispositivo</code>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-primary fw-bold fs-5" id="mini-hum-@inv.IdInvernadero">-- %</span>
-                                <span class="text-danger fw-bold fs-5" id="mini-temp-@inv.IdInvernadero">-- °C</span>
-                            </div>
+                        </div>
+                        <div class="small text-muted mb-2">
+                            Planta: <strong class="text-success">@inv.Planta?.Nombre</strong> · Nodo: <code>@(s?.CodigoDispositivo ?? "Sin ESP32")</code>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-primary fw-bold fs-5" id="mini-hum-@inv.IdInvernadero">-- %</span>
+                            <span class="text-danger fw-bold fs-5" id="mini-temp-@inv.IdInvernadero">-- °C</span>
                         </div>
                     </div>
-                </a>
+                </div>
             </div>
         }
     </div>
 
-    <!-- 2. ENCABEZADO DEL INVERNADERO SELECCIONADO -->
+    <!-- 2. ENCABEZADO DEL INVERNADERO SELECCIONADO + INDICADOR DE SALUD -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
-            <h2 class="fw-bold text-success mb-0">@Model?.Nombre — @Model?.Planta?.Nombre</h2>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <h2 class="fw-bold text-success mb-0">@Model?.Nombre — @Model?.Planta?.Nombre</h2>
+                <span id="badge-salud-planta" class="badge bg-light text-dark border fs-6 px-3 py-1">
+                    Esperando lectura...
+                </span>
+            </div>
             <small class="text-muted">
-                @Model?.Ubicacion · Dispositivo ESP32: <strong>@sensorActual?.CodigoDispositivo</strong> (@sensorActual?.NombreNodo)
+                @Model?.Ubicacion · Dispositivo ESP32: <strong>@(sensorActual?.CodigoDispositivo ?? "Sin asignar")</strong> (@(sensorActual?.NombreNodo ?? "-"))
             </small>
         </div>
         <span id="badge-conexion" class="badge bg-secondary fs-6 px-3 py-2">
@@ -60,9 +107,14 @@
                     <div class="display-5 fw-bold text-primary my-1">
                         <span id="kpi-humedad">--</span> %
                     </div>
-                    <span class="badge bg-light text-dark border">
-                        Rango óptimo: @Model?.Planta?.HumedadMinima% - @Model?.Planta?.HumedadMaxima%
-                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        <span class="badge bg-light text-dark border">
+                            Mín-Máx: @hMin% - @hMax%
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                            Óptima: ≥ @hOptimaCalculada.ToString("0.0")%
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -99,7 +151,7 @@
         <div class="col-lg-8">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                    <span>Curva Ambiental en Tiempo Real Invernadero</span>
+                    <span>Curva Ambiental en Tiempo Real (@Model?.Nombre)</span>
                     <span class="badge bg-dark" id="reloj-actual">--:--:--</span>
                 </div>
                 <div class="card-body">
@@ -127,6 +179,7 @@
                             string colorBadge = item.TipoEvento switch
                             {
                                 "RIEGO_EMERGENCIA" => "bg-danger",
+                                "RIEGO_REDUCIDO" => "bg-success",
                                 "RIEGO_PROGRAMADO" => "bg-primary",
                                 "RIEGO_POSPUESTO" => "bg-warning text-dark",
                                 _ => "bg-secondary"
@@ -147,12 +200,13 @@
     </div>
 </div>
 
+<!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES EN VIVO (TOASTS INFERIOR DERECHA) -->
+<div id="contenedor-toasts-vivo"
+     class="toast-container position-fixed bottom-0 end-0 p-3"
+     style="z-index: 1080;">
+</div>
+
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="~/js/monitoreo.js" asp-append-version="true"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            iniciarMonitor(@idActual);
-        });
-    </script>
 }

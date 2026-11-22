@@ -2,7 +2,8 @@
 @using System.Security.Claims
 @inject IHttpContextAccessor HttpContextAccessor
 @{
-    var estaAutenticado = User.Identity?.IsAuthenticated == true;
+    var estaAutenticado = User.Identity?.IsAuthenticated == true
+        || HttpContextAccessor.HttpContext?.Session.GetInt32("IdUsuario").HasValue == true;
     var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
     int? idUsuario = int.TryParse(idClaim, out int idDesdeClaim)
         ? idDesdeClaim
@@ -79,6 +80,9 @@
                     <div class="sidebar-section-label sidebar-section-label--inside">ADMINISTRACIÓN</div>
                     <a class="sidebar-link @(controladorActual == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
                         <span class="sidebar-icon" aria-hidden="true">US</span><span>Gestionar Usuarios</span>
+                    </a>
+                    <a class="sidebar-link @(controladorActual == "Sensores" ? "active" : "")" asp-controller="Sensores" asp-action="Index">
+                        <span class="sidebar-icon" aria-hidden="true">SI</span><span>Sensores IoT</span>
                     </a>
                 }
             </nav>

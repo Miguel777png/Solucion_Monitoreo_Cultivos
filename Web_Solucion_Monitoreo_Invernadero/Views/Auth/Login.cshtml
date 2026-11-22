@@ -66,22 +66,22 @@
                     <p>Ingresa tus credenciales para acceder al sistema.</p>
                 </div>
 
-                @if (ViewBag.Error != null)
+                @if (TempData["MensajeError"] != null)
                 {
                     <div class="login-error" role="alert">
                         <span aria-hidden="true">!</span>
-                        <div><strong>No fue posible ingresar</strong><small>@ViewBag.Error</small></div>
+                        <div><strong>No fue posible ingresar</strong><small>@TempData["MensajeError"]</small></div>
                     </div>
                 }
 
-                <form asp-action="Login" method="post" class="login-form">
+                <form asp-action="IniciarSesion" method="post" class="login-form">
                     <div class="login-field">
                         <label for="email">Correo electrónico</label>
                         <div class="login-input-wrap">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M3 6.5h18v11H3zM3.8 7.2 12 13l8.2-5.8" />
                             </svg>
-                            <input id="email" type="email" name="email" placeholder="nombre@invernadero.cl"
+                            <input id="email" type="email" name="correo" placeholder="nombre@invernadero.cl"
                                    autocomplete="username" inputmode="email" required autofocus />
                         </div>
                     </div>

@@ -1,10 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
+using Web_Solucion_Monitoreo_Invernadero.Filters;
+using Web_Solucion_Monitoreo_Invernadero.Models;
 using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+    [VerificarAcceso]
     public class InvernaderosController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -16,74 +19,195 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             _auditoria = auditoria;
         }
 
-        public async Task<IActionResult> Index()
+        // VISTA MAESTRO-DETALLE (TABLA + FICHA SELECCIONADA)
+        public async Task<IActionResult> Index(int? idSeleccionado)
         {
             var invernaderos = await _db.Invernaderos
                 .Include(i => i.Planta)
                 .Include(i => i.Sensores)
-                .Include(i => i.UsuarioModificacion)
                 .Where(i => i.State)
                 .OrderBy(i => i.IdInvernadero)
                 .ToListAsync();
 
-            // Traemos todas las plantas activas con su invernadero actual para filtrar disponibilidad 1:1 en la vista
-            ViewBag.TodasPlantas = await _db.Plantas
+            var seleccionado = idSeleccionado.HasValue
+                ? invernaderos.FirstOrDefault(i => i.IdInvernadero == idSeleccionado.Value)
+                : invernaderos.FirstOrDefault();
+
+            seleccionado ??= invernaderos.FirstOrDefault();
+
+            // Plantas activas libres (no asignadas a otro invernadero activo)
+            var plantasDisponibles = await _db.Plantas
                 .Include(p => p.Invernadero)
-                .Where(p => p.State)
+                .Where(p => p.State && (p.Invernadero == null || !p.Invernadero.State))
                 .OrderBy(p => p.Nombre)
                 .ToListAsync();
+
+            // Sensores activos en lista blanca sin invernadero asignado
+            var sensoresDisponibles = await _db.Sensores
+                .Where(s => s.State && s.IdInvernadero == null)
+                .OrderBy(s => s.CodigoDispositivo)
+                .ToListAsync();
+
+            ViewBag.Seleccionado = seleccionado;
+            ViewBag.PlantasDisponibles = plantasDisponibles;
+            ViewBag.SensoresDisponibles = sensoresDisponibles;
+            ViewBag.EsAdministrador = (HttpContext.Session.GetString("RolUsuario") ?? "")
+                .Equals("Administrador", StringComparison.OrdinalIgnoreCase);
 
             return View(invernaderos);
         }
 
+        // JARDINERO Y ADMINISTRADOR: Actualizar especie (1:1) y frecuencia histórica con ANTES -> DESPUÉS
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ActualizarAsignacion(
+        public async Task<IActionResult> ActualizarConfiguracionOperativa(
             int idInvernadero,
-            string nombre,
-            string ubicacion,
-            int idPlanta,
+            int? idNuevaPlanta,
             int frecuenciaRegistroMin)
         {
-            var inv = await _db.Invernaderos
+            var invernadero = await _db.Invernaderos
                 .Include(i => i.Planta)
-                .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero);
+                .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero && i.State);
 
-            if (inv == null) return RedirectToAction(nameof(Index));
-
-            // Validar que la nueva planta no esté ocupada por otro invernadero (Relación estricta 1:1)
-            bool ocupadaPorOtro = await _db.Invernaderos
-                .AnyAsync(i => i.IdPlanta == idPlanta && i.IdInvernadero != idInvernadero && i.State);
-
-            if (ocupadaPorOtro)
+            if (invernadero == null)
             {
-                TempData["MensajeError"] = "Esa planta ya está asignada a otro invernadero (relación 1:1).";
+                TempData["MensajeError"] = "Invernadero no encontrado.";
                 return RedirectToAction(nameof(Index));
             }
 
-            var nuevaPlanta = await _db.Plantas.FindAsync(idPlanta);
-            if (nuevaPlanta == null) return RedirectToAction(nameof(Index));
+            int nuevaFrecuencia = frecuenciaRegistroMin > 0 ? frecuenciaRegistroMin : 60;
+            string plantaAntes = invernadero.Planta?.Nombre ?? "Sin especie";
+            int freqAntes = invernadero.FrecuenciaRegistroMin;
 
-            string plantaAnterior = inv.Planta?.Nombre ?? "Sin planta";
-            int idUsuario = _auditoria.ObtenerIdUsuarioActual();
+            string plantaDespues = plantaAntes;
 
-            inv.Nombre = nombre.Trim();
-            inv.Ubicacion = ubicacion.Trim();
-            inv.IdPlanta = idPlanta;
-            inv.FrecuenciaRegistroMin = frecuenciaRegistroMin;
-            inv.IdUsuarioModificacion = idUsuario;
-            inv.FechaModificacion = DateTime.Now;
+            // Si seleccionó cambiar de planta, valida regla 1:1
+            if (idNuevaPlanta.HasValue && idNuevaPlanta.Value > 0 && idNuevaPlanta.Value != invernadero.IdPlanta)
+            {
+                var nuevaPlanta = await _db.Plantas
+                    .Include(p => p.Invernadero)
+                    .FirstOrDefaultAsync(p => p.IdPlanta == idNuevaPlanta.Value && p.State);
+
+                if (nuevaPlanta == null)
+                {
+                    TempData["MensajeError"] = "La especie seleccionada no es válida.";
+                    return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
+                }
+
+                if (nuevaPlanta.Invernadero != null &&
+                    nuevaPlanta.Invernadero.State &&
+                    nuevaPlanta.Invernadero.IdInvernadero != idInvernadero)
+                {
+                    TempData["MensajeError"] = $"La especie '{nuevaPlanta.Nombre}' ya está asignada a '{nuevaPlanta.Invernadero.Nombre}'.";
+                    return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
+                }
+
+                invernadero.IdPlanta = nuevaPlanta.IdPlanta;
+                plantaDespues = nuevaPlanta.Nombre;
+            }
+
+            invernadero.FrecuenciaRegistroMin = nuevaFrecuencia;
+            invernadero.IdUsuarioModificacion = HttpContext.Session.GetInt32("IdUsuario") ?? 1;
+            invernadero.FechaModificacion = DateTime.Now;
 
             await _db.SaveChangesAsync();
 
             await _auditoria.RegistrarAsync(
-                "ASIGNAR_PLANTA_INVERNADERO",
-                inv.Nombre,
-                $"Cambió planta de '{plantaAnterior}' a '{nuevaPlanta.Nombre}' y frecuencia histórica a {frecuenciaRegistroMin} min."
+                "CONFIGURAR_INVERNADERO",
+                invernadero.Nombre,
+                $"ANTES: Especie '{plantaAntes}', Guardado cada {freqAntes} min  --->  DESPUÉS: Especie '{plantaDespues}', Guardado cada {nuevaFrecuencia} min"
             );
 
-            TempData["MensajeExito"] = $"{inv.Nombre} actualizado con '{nuevaPlanta.Nombre}' (Usuario ID #{idUsuario}).";
-            return RedirectToAction(nameof(Index));
+            TempData["MensajeExito"] = $"Configuración de '{invernadero.Nombre}' actualizada correctamente.";
+            return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
+        }
+
+        // EXCLUSIVO ADMINISTRADOR: Crear nuevo Invernadero
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [VerificarAcceso(SoloAdministrador = true)]
+        public async Task<IActionResult> CrearInvernadero(
+            string nombre,
+            string? ubicacion,
+            int idPlanta,
+            int frecuenciaRegistroMin)
+        {
+            var planta = await _db.Plantas
+                .Include(p => p.Invernadero)
+                .FirstOrDefaultAsync(p => p.IdPlanta == idPlanta && p.State);
+
+            if (planta == null || (planta.Invernadero != null && planta.Invernadero.State))
+            {
+                TempData["MensajeError"] = "Debes elegir una especie disponible del catálogo (no asignada a otro sector).";
+                return RedirectToAction(nameof(Index));
+            }
+
+            int frecuencia = frecuenciaRegistroMin > 0 ? frecuenciaRegistroMin : 60;
+            int idUsuario = HttpContext.Session.GetInt32("IdUsuario") ?? 1;
+
+            var nuevoInv = new Invernadero
+            {
+                Nombre = nombre.Trim(),
+                Ubicacion = string.IsNullOrWhiteSpace(ubicacion) ? "Sector General" : ubicacion.Trim(),
+                IdPlanta = planta.IdPlanta,
+                FrecuenciaRegistroMin = frecuencia,
+                IdUsuarioModificacion = idUsuario,
+                State = true
+            };
+
+            _db.Invernaderos.Add(nuevoInv);
+            await _db.SaveChangesAsync();
+
+            await _auditoria.RegistrarAsync(
+                "CREAR_INVERNADERO",
+                nuevoInv.Nombre,
+                $"Creó sector '{nuevoInv.Nombre}' ({nuevoInv.Ubicacion}) con especie '{planta.Nombre}' y guardado cada {frecuencia} min."
+            );
+
+            TempData["MensajeExito"] = $"Invernadero '{nuevoInv.Nombre}' creado correctamente.";
+            return RedirectToAction(nameof(Index), new { idSeleccionado = nuevoInv.IdInvernadero });
+        }
+
+        // EXCLUSIVO ADMINISTRADOR: Vincular sensor disponible de la lista blanca al invernadero seleccionado
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [VerificarAcceso(SoloAdministrador = true)]
+        public async Task<IActionResult> AsignarSensorDisponible(int idInvernadero, int idSensor)
+        {
+            var invernadero = await _db.Invernaderos
+                .Include(i => i.Sensores)
+                .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero && i.State);
+
+            var sensorNuevo = await _db.Sensores
+                .FirstOrDefaultAsync(s => s.IdSensor == idSensor && s.State && s.IdInvernadero == null);
+
+            if (invernadero == null || sensorNuevo == null)
+            {
+                TempData["MensajeError"] = "El sensor seleccionado ya no está disponible o el invernadero no es válido.";
+                return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
+            }
+
+            // Si el invernadero ya tenía un sensor previo, lo libera a estado Disponible
+            var sensorPrevio = invernadero.Sensores.FirstOrDefault();
+            string sensorAntes = sensorPrevio?.CodigoDispositivo ?? "Sin sensor asignado";
+
+            if (sensorPrevio != null)
+            {
+                sensorPrevio.IdInvernadero = null;
+                sensorPrevio.EstadoConexion = "Desconectado";
+            }
+
+            sensorNuevo.IdInvernadero = idInvernadero;
+            await _db.SaveChangesAsync();
+
+            await _auditoria.RegistrarAsync(
+                "VINCULAR_SENSOR_INVERNADERO",
+                invernadero.Nombre,
+                $"Sensor vinculado | ANTES: {sensorAntes}  --->  DESPUÉS: {sensorNuevo.CodigoDispositivo}"
+            );
+
+            TempData["MensajeExito"] = $"Dispositivo '{sensorNuevo.CodigoDispositivo}' vinculado a '{invernadero.Nombre}'.";
+            return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
         }
     }
 }

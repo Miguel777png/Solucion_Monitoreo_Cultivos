@@ -72,19 +72,43 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
 
                 estadoRam.UltimoMinutoEvaluadoCalendario = claveMinutoActual;
 
+                var planta = horario.Invernadero!.Planta!;
                 decimal humedadActual = estadoRam.UltimaHumedad;
-                decimal humedadMinima = horario.Invernadero!.Planta!.HumedadMinima;
+                decimal humedadMinima = planta.HumedadMinima;
+                decimal humedadOptima = (planta.HumedadMinima + planta.HumedadMaxima) / 2m;
 
-                if (estadoRam.SensorConectado && humedadActual >= humedadMinima)
+                if (estadoRam.SensorConectado && humedadActual >= humedadOptima)
                 {
+                    // ZONA ÓPTIMA: Pospone el riego completo y ejecuta riego reducido de 20 segundos
                     horario.PospuestoHasta = DateOnly.FromDateTime(ahora.AddHours(2));
+                    estadoRam.RiegoProgramadoPendiente = true;
+                    estadoRam.SegundosRiegoProgramado = 20;
 
                     db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
                     {
                         IdInvernadero = idInv,
-                        TipoEvento = "RIEGO_POSPUESTO",
-                        Descripcion = $"Riego programado ({ahora:HH:mm}) pospuesto: humedad actual ({humedadActual}%) ya es óptima (>= {humedadMinima}%).",
-                        TiempoActivacionSeg = 0,
+                        TipoEvento = "RIEGO_REDUCIDO",
+                        Descripcion = $"[{planta.Nombre}] Riego programado ({ahora:HH:mm}) pospuesto por humedad óptima ({humedadActual}% >= {humedadOptima:0.0}%): aplicado riego reducido de 20s.",
+                        TiempoActivacionSeg = 20,
+                        HumedadMomento = humedadActual,
+                        TemperaturaMomento = estadoRam.UltimaTemperatura,
+                        FechaHora = ahora,
+                        Leida = false
+                    });
+                }
+                else if (estadoRam.SensorConectado && humedadActual < humedadMinima)
+                {
+                    // BAJO EL MÍNIMO: Alerta crítica y riego de emergencia de 3 minutos (180 seg)
+                    horario.PospuestoHasta = null;
+                    estadoRam.RiegoProgramadoPendiente = true;
+                    estadoRam.SegundosRiegoProgramado = 180;
+
+                    db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
+                    {
+                        IdInvernadero = idInv,
+                        TipoEvento = "RIEGO_EMERGENCIA",
+                        Descripcion = $"[{planta.Nombre}] Horario programado ({ahora:HH:mm}) coincidió con humedad crítica ({humedadActual}% < {humedadMinima}%): alerta y riego de 3 min (180s).",
+                        TiempoActivacionSeg = 180,
                         HumedadMomento = humedadActual,
                         TemperaturaMomento = estadoRam.UltimaTemperatura,
                         FechaHora = ahora,
@@ -93,15 +117,16 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                 }
                 else
                 {
+                    // ENTRE MÍNIMO Y ÓPTIMO (o sin lectura activa): Ejecuta el riego programado normal
+                    horario.PospuestoHasta = null;
                     estadoRam.RiegoProgramadoPendiente = true;
                     estadoRam.SegundosRiegoProgramado = horario.TiempoRiegoSeg;
-                    horario.PospuestoHasta = null;
 
                     db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
                     {
                         IdInvernadero = idInv,
                         TipoEvento = "RIEGO_PROGRAMADO",
-                        Descripcion = $"Riego programado ejecutado ({ahora:HH:mm}) durante {horario.TiempoRiegoSeg}s para {horario.Invernadero.Planta.Nombre}.",
+                        Descripcion = $"[{planta.Nombre}] Riego programado ejecutado ({ahora:HH:mm}) durante {horario.TiempoRiegoSeg}s (humedad {humedadActual}% bajo óptimo {humedadOptima:0.0}%).",
                         TiempoActivacionSeg = horario.TiempoRiegoSeg,
                         HumedadMomento = humedadActual,
                         TemperaturaMomento = estadoRam.UltimaTemperatura,

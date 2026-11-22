@@ -20,9 +20,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             _ram = ram;
         }
 
-
-
-        // 4. ENDPOINT DE ALERTAS EN VIVO PARA EL PANEL DERECHO DEL DASHBOARD
+        // 4. ENDPOINT DE ALERTAS EN VIVO PARA EL PANEL DERECHO Y TOASTS DEL DASHBOARD
         [HttpGet("alertas/{idInvernadero:int}")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> ObtenerAlertasRecientes(int idInvernadero)
@@ -33,8 +31,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .Take(8)
                 .Select(b => new
                 {
+                    idBitacora = b.IdBitacora,
                     tipoEvento = b.TipoEvento,
                     descripcion = b.Descripcion,
+                    tiempoSeg = b.TiempoActivacionSeg,
                     fechaHora = b.FechaHora.ToString("dd/MM HH:mm:ss")
                 })
                 .ToListAsync();
@@ -42,14 +42,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return Ok(alertas);
         }
 
-
-
-        // 1. ENDPOINT PARA LOS 3 ESP32: POST /api/telemetria
+        // 1. ENDPOINT PARA LOS ESP32: POST /api/telemetria
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> RecibirLectura([FromBody] LecturaSensorDto datos)
         {
-            // Filtra por lista blanca: solo entran ESP32-ORQ-01, ESP32-ORQ-02 o ESP32-ORQ-03 activos
             var sensor = await _db.Sensores
                 .Include(s => s.Invernadero)
                     .ThenInclude(i => i!.Planta)
@@ -60,7 +57,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 return NotFound(new { mensaje = $"Dispositivo '{datos.CodigoDispositivo}' no registrado o inactivo." });
             }
 
-            int idInv = sensor.IdInvernadero;
+            int idInv = sensor.IdInvernadero!.Value;
             var estadoRam = _ram.ObtenerOCrear(idInv);
             var planta = sensor.Invernadero.Planta;
 
@@ -83,26 +80,31 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             estadoRam.RegistrarLectura(datos.Humedad, datos.Temperatura);
 
-            // Evaluación de las 4 reglas según la planta del invernadero
-            bool necesitaRiegoEmergencia = datos.Humedad < estadoRam.HumedadMinima || datos.Temperatura > estadoRam.TemperaturaMaxima;
+            // En tiempo real: SOLO se dispara riego de emergencia si baja del mínimo (peligro) o sube mucho la temperatura.
+            // Si está entre el mínimo y el óptimo, se espera a que actúe el Calendario Programado.
+            bool peligroCritico = datos.Humedad < estadoRam.HumedadMinima || datos.Temperatura > estadoRam.TemperaturaMaxima;
             bool alertaSinRiego = datos.Humedad > estadoRam.HumedadMaxima || datos.Temperatura < estadoRam.TemperaturaMinima;
-            bool activarRegadera = false;
 
-            if (necesitaRiegoEmergencia || alertaSinRiego)
+            bool activarRegadera = false;
+            int segundosAEncender = 0;
+
+            if (peligroCritico || alertaSinRiego)
             {
-                if ((DateTime.Now - estadoRam.UltimaAlertaCritica).TotalMinutes >= 5)
+                if ((DateTime.Now - estadoRam.UltimaAlertaCritica).TotalMinutes >= 1)
                 {
                     estadoRam.UltimaAlertaCritica = DateTime.Now;
 
-                    if (necesitaRiegoEmergencia)
+                    if (peligroCritico)
                     {
                         activarRegadera = true;
+                        segundosAEncender = 180; // 3 minutos de riego de emergencia
+
                         _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
                         {
                             IdInvernadero = idInv,
                             TipoEvento = "RIEGO_EMERGENCIA",
-                            Descripcion = $"[{planta.Nombre}] Umbral crítico (Riego activado): Humedad {datos.Humedad}% / Temp {datos.Temperatura}°C",
-                            TiempoActivacionSeg = 5,
+                            Descripcion = $"[{planta.Nombre}] ALERTA (< Mín {planta.HumedadMinima}%): Riego de emergencia 3 min (180s). Hum: {datos.Humedad}% | Temp: {datos.Temperatura}°C",
+                            TiempoActivacionSeg = 180,
                             HumedadMomento = datos.Humedad,
                             TemperaturaMomento = datos.Temperatura,
                             FechaHora = DateTime.Now,
@@ -149,8 +151,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 await _db.SaveChangesAsync();
             }
 
-            int segundosAEncender = activarRegadera ? 5 : 0;
-
+            // Si el RiegoProgramadoWorker dejó un riego listo, toma prioridad sobre el pulso actual
             if (estadoRam.RiegoProgramadoPendiente)
             {
                 activarRegadera = true;
@@ -168,9 +169,35 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         // 2. ENDPOINT EN VIVO DE UN INVERNADERO ESPECÍFICO: GET /api/telemetria/actual/1
         [HttpGet("actual/{idInvernadero:int}")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-        public IActionResult ObtenerEnVivo(int idInvernadero)
+        public async Task<IActionResult> ObtenerEnVivo(int idInvernadero)
         {
             var estado = _ram.ObtenerOCrear(idInvernadero);
+            var inv = await _db.Invernaderos
+                .Include(i => i.Planta)
+                .FirstOrDefaultAsync(i => i.IdInvernadero == idInvernadero);
+
+            string estadoSalud = "SIN_DATOS";
+            decimal humedadOptima = 0;
+
+            if (inv?.Planta != null && estado.SensorConectado)
+            {
+                var p = inv.Planta;
+                humedadOptima = (p.HumedadMinima + p.HumedadMaxima) / 2m;
+
+                bool fueraRango = estado.UltimaHumedad < p.HumedadMinima ||
+                                  estado.UltimaHumedad > p.HumedadMaxima ||
+                                  estado.UltimaTemperatura < p.TemperaturaMinima ||
+                                  estado.UltimaTemperatura > p.TemperaturaMaxima;
+
+                bool enMargenMinimo = estado.UltimaHumedad >= p.HumedadMinima && estado.UltimaHumedad < humedadOptima;
+
+                if (fueraRango)
+                    estadoSalud = "PELIGRO";
+                else if (enMargenMinimo)
+                    estadoSalud = "PRECAUCION";
+                else
+                    estadoSalud = "OPTIMO";
+            }
 
             return Ok(new
             {
@@ -178,6 +205,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 conectado = estado.SensorConectado,
                 humedadActual = estado.UltimaHumedad,
                 temperaturaActual = estado.UltimaTemperatura,
+                humedadOptima = humedadOptima,
+                estadoSalud = estadoSalud,
                 ultimaHora = estado.UltimaActualizacion == DateTime.MinValue
                     ? "Sin datos"
                     : estado.UltimaActualizacion.ToString("HH:mm:ss"),
@@ -185,20 +214,49 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             });
         }
 
-        // 3. ENDPOINT GLOBAL PARA LAS 3 TARJETAS DEL DASHBOARD: GET /api/telemetria/resumen-todos
+        // 3. ENDPOINT GLOBAL DINÁMICO PARA N INVERNADEROS: GET /api/telemetria/resumen-todos
         [HttpGet("resumen-todos")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-        public IActionResult ObtenerResumenTodos()
+        public async Task<IActionResult> ObtenerResumenTodos()
         {
-            var resumen = new[] { 1, 2, 3 }.Select(id =>
+            var invernaderos = await _db.Invernaderos
+                .Include(i => i.Planta)
+                .Where(i => i.State)
+                .OrderBy(i => i.IdInvernadero)
+                .ToListAsync();
+
+            var resumen = invernaderos.Select(inv =>
             {
-                var est = _ram.ObtenerOCrear(id);
+                var est = _ram.ObtenerOCrear(inv.IdInvernadero);
+                string salud = "SIN_DATOS";
+
+                if (inv.Planta != null && est.SensorConectado)
+                {
+                    var p = inv.Planta;
+                    decimal hOptima = (p.HumedadMinima + p.HumedadMaxima) / 2m;
+
+                    if (est.UltimaHumedad < p.HumedadMinima || est.UltimaHumedad > p.HumedadMaxima ||
+                        est.UltimaTemperatura < p.TemperaturaMinima || est.UltimaTemperatura > p.TemperaturaMaxima)
+                    {
+                        salud = "PELIGRO";
+                    }
+                    else if (est.UltimaHumedad < hOptima)
+                    {
+                        salud = "PRECAUCION";
+                    }
+                    else
+                    {
+                        salud = "OPTIMO";
+                    }
+                }
+
                 return new
                 {
-                    idInvernadero = id,
+                    idInvernadero = inv.IdInvernadero,
                     conectado = est.SensorConectado,
                     humedad = est.UltimaHumedad,
-                    temperatura = est.UltimaTemperatura
+                    temperatura = est.UltimaTemperatura,
+                    estadoSalud = salud
                 };
             });
 
