@@ -1,4 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
 
@@ -14,10 +18,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public IActionResult Login()
         {
-            // Si ya tiene sesión iniciada, entra directo al Monitor
-            if (HttpContext.Session.GetInt32("IdUsuario").HasValue)
+            if (User.Identity?.IsAuthenticated == true || HttpContext.Session.GetInt32("IdUsuario").HasValue)
             {
                 return RedirectToAction("Index", "Monitoreo");
             }
@@ -26,9 +30,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         }
 
         [HttpPost]
+        [AllowAnonymous]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> IniciarSesion(string correo, string password)
         {
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                return RedirectToAction("Index", "Monitoreo");
+            }
+
             if (string.IsNullOrWhiteSpace(correo) || string.IsNullOrWhiteSpace(password))
             {
                 TempData["MensajeError"] = "Debe ingresar su correo y contraseña.";
@@ -48,18 +58,50 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 return RedirectToAction(nameof(Login));
             }
 
-            // Mantiene exactamente las mismas variables de sesión de tu sistema y auditoría
             HttpContext.Session.SetInt32("IdUsuario", usuario.IdUsuario);
             HttpContext.Session.SetString("NombreUsuario", usuario.Nombre);
             HttpContext.Session.SetString("RolUsuario", usuario.Rol);
 
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, usuario.IdUsuario.ToString()),
+                new(ClaimTypes.Name, usuario.Nombre),
+                new(ClaimTypes.Email, usuario.Email),
+                new(ClaimTypes.Role, usuario.Rol)
+            };
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    AllowRefresh = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(4)
+                });
+
             return RedirectToAction("Index", "Monitoreo");
         }
 
-        public IActionResult Logout()
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Logout()
         {
             HttpContext.Session.Clear();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction(nameof(Login));
+        }
+
+        [HttpGet]
+        [Authorize]
+        public IActionResult AccesoDenegado()
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return View();
         }
     }
 }

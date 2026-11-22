@@ -10,25 +10,19 @@ namespace Web_Solucion_Monitoreo_Invernadero.Filters
 
         public override void OnActionExecuting(ActionExecutingContext context)
         {
-            var session = context.HttpContext.Session;
-            int? idUsuario = session.GetInt32("IdUsuario");
+            var usuario = context.HttpContext.User;
 
-            // 1. Si no ha iniciado sesión, redirige obligatorio al Login
-            if (!idUsuario.HasValue || idUsuario.Value <= 0)
+            // La cookie autenticada y sus claims son la fuente de autorización.
+            if (usuario.Identity?.IsAuthenticated != true)
             {
                 context.Result = new RedirectToActionResult("Login", "Auth", null);
                 return;
             }
 
-            // 2. Si la ruta exige rol Administrador y el usuario no lo es, bloquea el paso
-            if (SoloAdministrador)
+            if (SoloAdministrador && !usuario.IsInRole("Administrador"))
             {
-                string rol = session.GetString("RolUsuario") ?? "";
-                if (!rol.Equals("Administrador", StringComparison.OrdinalIgnoreCase))
-                {
-                    context.Result = new RedirectToActionResult("Index", "Monitoreo", null);
-                    return;
-                }
+                context.Result = new RedirectToActionResult("AccesoDenegado", "Auth", null);
+                return;
             }
 
             base.OnActionExecuting(context);

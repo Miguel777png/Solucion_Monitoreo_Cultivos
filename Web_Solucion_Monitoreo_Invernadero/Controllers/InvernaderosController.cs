@@ -51,8 +51,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             ViewBag.Seleccionado = seleccionado;
             ViewBag.PlantasDisponibles = plantasDisponibles;
             ViewBag.SensoresDisponibles = sensoresDisponibles;
-            ViewBag.EsAdministrador = (HttpContext.Session.GetString("RolUsuario") ?? "")
-                .Equals("Administrador", StringComparison.OrdinalIgnoreCase);
+            ViewBag.EsAdministrador = User.IsInRole("Administrador");
 
             return View(invernaderos);
         }

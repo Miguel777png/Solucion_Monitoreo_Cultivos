@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Web_Solucion_Monitoreo_Invernadero.Database;
 using Web_Solucion_Monitoreo_Invernadero.Models;
@@ -43,6 +44,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
         // 1. ENDPOINT PARA LOS ESP32: POST /api/telemetria
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> RecibirLectura([FromBody] LecturaSensorDto datos)
         {
             var sensor = await _db.Sensores
