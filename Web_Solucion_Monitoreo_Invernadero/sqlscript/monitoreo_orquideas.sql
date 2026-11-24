@@ -69,7 +69,27 @@ CREATE TABLE calendario_riego (
     CONSTRAINT fk_calendario_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- 6. REGISTRO HISTÓRICO AMBIENTAL
+-- 6. ÓRDENES PERSISTENTES DE RIEGO PARA LOS ESP32
+CREATE TABLE comandos_riego (
+    id_comando_riego INT AUTO_INCREMENT PRIMARY KEY,
+    id_invernadero INT NOT NULL,
+    id_calendario_riego INT NULL,
+    estado VARCHAR(30) NOT NULL DEFAULT 'Pendiente',
+    duracion_seg INT NOT NULL,
+    prioridad INT NOT NULL DEFAULT 50,
+    clave_idempotencia VARCHAR(100) NOT NULL UNIQUE,
+    fecha_creacion DATETIME NOT NULL,
+    fecha_expiracion DATETIME NOT NULL,
+    fecha_entrega DATETIME NULL,
+    fecha_confirmacion DATETIME NULL,
+    fecha_finalizacion DATETIME NULL,
+    detalle VARCHAR(255) NULL,
+    INDEX ix_comandos_entrega (id_invernadero, estado, fecha_expiracion),
+    CONSTRAINT fk_comando_invernadero FOREIGN KEY (id_invernadero) REFERENCES invernaderos(id_invernadero),
+    CONSTRAINT fk_comando_calendario FOREIGN KEY (id_calendario_riego) REFERENCES calendario_riego(id_calendario_riego)
+);
+
+-- 7. REGISTRO HISTÓRICO AMBIENTAL
 CREATE TABLE registro_historico (
     id_registro INT AUTO_INCREMENT PRIMARY KEY,
     id_invernadero INT NOT NULL,
@@ -80,7 +100,7 @@ CREATE TABLE registro_historico (
     CONSTRAINT fk_historico_invernadero FOREIGN KEY (id_invernadero) REFERENCES invernaderos(id_invernadero)
 );
 
--- 7. BITÁCORA DE RIEGO Y ALERTAS AUTOMÁTICAS
+-- 8. BITÁCORA DE RIEGO Y ALERTAS AUTOMÁTICAS
 CREATE TABLE bitacora_riego_alertas (
     id_bitacora INT AUTO_INCREMENT PRIMARY KEY,
     id_invernadero INT NOT NULL,
@@ -94,7 +114,7 @@ CREATE TABLE bitacora_riego_alertas (
     CONSTRAINT fk_bitacora_invernadero FOREIGN KEY (id_invernadero) REFERENCES invernaderos(id_invernadero)
 );
 
--- 8. AUDITORÍA DE CAMBIOS MANUALES (Trazabilidad completa de acciones por usuario)
+-- 9. AUDITORÍA DE CAMBIOS MANUALES (Trazabilidad completa de acciones por usuario)
 CREATE TABLE auditoria_cambios (
     id_auditoria INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
@@ -103,6 +123,27 @@ CREATE TABLE auditoria_cambios (
     detalle VARCHAR(255) NOT NULL,
     fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+CREATE TABLE IF NOT EXISTS comandos_riego (
+    id_comando_riego INT AUTO_INCREMENT PRIMARY KEY,
+    id_invernadero INT NOT NULL,
+    id_calendario_riego INT NULL,
+    estado VARCHAR(30) NOT NULL DEFAULT 'Pendiente',
+    duracion_seg INT NOT NULL,
+    prioridad INT NOT NULL DEFAULT 50,
+    clave_idempotencia VARCHAR(100) NOT NULL UNIQUE,
+    fecha_creacion DATETIME NOT NULL,
+    fecha_expiracion DATETIME NOT NULL,
+    fecha_entrega DATETIME NULL,
+    fecha_confirmacion DATETIME NULL,
+    fecha_finalizacion DATETIME NULL,
+    detalle VARCHAR(255) NULL,
+    INDEX ix_comandos_entrega (id_invernadero, estado, fecha_expiracion),
+    CONSTRAINT fk_comando_invernadero
+        FOREIGN KEY (id_invernadero) REFERENCES invernaderos(id_invernadero),
+    CONSTRAINT fk_comando_calendario
+        FOREIGN KEY (id_calendario_riego) REFERENCES calendario_riego(id_calendario_riego)
 );
 
 -- ==========================================================

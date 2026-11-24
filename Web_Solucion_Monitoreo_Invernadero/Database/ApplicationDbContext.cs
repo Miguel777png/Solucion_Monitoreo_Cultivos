@@ -14,6 +14,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Database
         public DbSet<RegistroHistorico> RegistroHistorico { get; set; }
         public DbSet<BitacoraRiegoAlerta> BitacoraRiegoAlertas { get; set; }
         public DbSet<CalendarioRiego> CalendarioRiego { get; set; }
+        public DbSet<ComandoRiego> ComandosRiego { get; set; }
         public DbSet<AuditoriaCambio> AuditoriaCambios { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -46,6 +47,25 @@ namespace Web_Solucion_Monitoreo_Invernadero.Database
                 .HasOne(c => c.Usuario)
                 .WithMany(u => u.CalendariosCreados)
                 .HasForeignKey(c => c.IdUsuario)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ComandoRiego>()
+                .HasIndex(c => c.ClaveIdempotencia)
+                .IsUnique();
+
+            modelBuilder.Entity<ComandoRiego>()
+                .HasIndex(c => new { c.IdInvernadero, c.Estado, c.FechaExpiracion });
+
+            modelBuilder.Entity<ComandoRiego>()
+                .HasOne(c => c.Invernadero)
+                .WithMany()
+                .HasForeignKey(c => c.IdInvernadero)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ComandoRiego>()
+                .HasOne(c => c.CalendarioRiego)
+                .WithMany()
+                .HasForeignKey(c => c.IdCalendarioRiego)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

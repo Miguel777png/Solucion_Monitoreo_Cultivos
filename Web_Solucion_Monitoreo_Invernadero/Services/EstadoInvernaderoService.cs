@@ -25,11 +25,6 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         public DateTime UltimoRiegoEmergencia { get; set; } = DateTime.MinValue;
         public DateTime UltimaAlertaUmbral { get; set; } = DateTime.MinValue;
 
-        // Control de riego programado desde BackgroundService
-        public bool RiegoProgramadoPendiente { get; set; } = false;
-        public int SegundosRiegoProgramado { get; set; } = 15;
-        public string UltimoMinutoEvaluadoCalendario { get; set; } = string.Empty;
-
         public int FrecuenciaRegistroMin { get; set; } = 60;
         public decimal TemperaturaMaxima { get; set; } = 24.00m;
         public decimal TemperaturaMinima { get; set; } = 18.00m;

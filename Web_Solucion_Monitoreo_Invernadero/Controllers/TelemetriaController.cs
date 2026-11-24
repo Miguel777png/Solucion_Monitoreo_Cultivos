@@ -175,17 +175,34 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 await _db.SaveChangesAsync();
             }
 
-            // El riego programado solo se entrega si no se acaba de ordenar un
-            // riego de emergencia. En caso contrario queda cubierto por esos 180s.
-            if (estadoRam.RiegoProgramadoPendiente)
+            ComandoRiego? comandoRiego = null;
+
+            // Una orden persistente permanece disponible hasta que el ESP32 la
+            // confirme, expire o falle. La temperatura nunca crea estas órdenes.
+            if (!activarRegadera)
             {
-                if (!activarRegadera)
+                comandoRiego = await _db.ComandosRiego
+                    .Where(c =>
+                        c.IdInvernadero == idInv &&
+                        (c.Estado == EstadosComandoRiego.Pendiente ||
+                         c.Estado == EstadosComandoRiego.Entregado) &&
+                        c.FechaExpiracion > ahora)
+                    .OrderByDescending(c => c.Prioridad)
+                    .ThenBy(c => c.FechaCreacion)
+                    .FirstOrDefaultAsync();
+
+                if (comandoRiego != null)
                 {
                     activarRegadera = true;
-                    segundosAEncender = estadoRam.SegundosRiegoProgramado;
-                }
+                    segundosAEncender = comandoRiego.DuracionSeg;
 
-                estadoRam.RiegoProgramadoPendiente = false;
+                    if (comandoRiego.Estado == EstadosComandoRiego.Pendiente)
+                    {
+                        comandoRiego.Estado = EstadosComandoRiego.Entregado;
+                        comandoRiego.FechaEntrega = ahora;
+                        await _db.SaveChangesAsync();
+                    }
+                }
             }
 
             return Ok(new
@@ -195,7 +212,123 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 activarVentilacion = activarVentilacion,
                 activarCalefaccion = activarCalefaccion,
                 temperaturaMinima = planta.TemperaturaMinima,
-                temperaturaMaxima = planta.TemperaturaMaxima
+                temperaturaMaxima = planta.TemperaturaMaxima,
+                idComandoRiego = comandoRiego?.IdComandoRiego,
+                claveIdempotencia = comandoRiego?.ClaveIdempotencia,
+                fechaExpiracion = comandoRiego?.FechaExpiracion
+            });
+        }
+
+        // El ESP32 confirma primero que comenzó la orden y luego que cerró la
+        // válvula. Las confirmaciones repetidas son idempotentes.
+        [HttpPost("comandos/confirmar")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ConfirmarComando(
+            [FromBody] ConfirmacionComandoRiegoDto confirmacion)
+        {
+            string codigo = confirmacion.CodigoDispositivo.Trim().ToUpperInvariant();
+            string estadoSolicitado = confirmacion.Estado.Trim();
+
+            var sensor = await _db.Sensores
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s =>
+                    s.CodigoDispositivo == codigo &&
+                    s.State &&
+                    s.IdInvernadero != null);
+
+            if (sensor?.IdInvernadero == null)
+                return NotFound(new { mensaje = "Dispositivo no registrado, inactivo o sin invernadero." });
+
+            var comando = await _db.ComandosRiego
+                .FirstOrDefaultAsync(c =>
+                    c.IdComandoRiego == confirmacion.IdComandoRiego &&
+                    c.IdInvernadero == sensor.IdInvernadero.Value);
+
+            if (comando == null)
+                return NotFound(new { mensaje = "La orden de riego no existe para este dispositivo." });
+
+            if (comando.Estado == EstadosComandoRiego.Expirado)
+                return Conflict(new { mensaje = "La orden ya expiró.", estado = comando.Estado });
+
+            if (comando.Estado == EstadosComandoRiego.Fallido &&
+                !confirmacion.Estado.Equals(EstadosComandoRiego.Fallido, StringComparison.OrdinalIgnoreCase))
+            {
+                return Conflict(new { mensaje = "La orden ya fue declarada fallida.", estado = comando.Estado });
+            }
+
+            DateTime ahora = DateTime.Now;
+            bool agregarEventoFinal = false;
+            string tipoEventoFinal = string.Empty;
+            string descripcionFinal = string.Empty;
+
+            if (estadoSolicitado.Equals(EstadosComandoRiego.Confirmado, StringComparison.OrdinalIgnoreCase))
+            {
+                if (comando.Estado == EstadosComandoRiego.Completado ||
+                    comando.Estado == EstadosComandoRiego.Fallido)
+                {
+                    return Ok(new { comando.IdComandoRiego, comando.Estado });
+                }
+
+                comando.Estado = EstadosComandoRiego.Confirmado;
+                comando.FechaConfirmacion ??= ahora;
+            }
+            else if (estadoSolicitado.Equals(EstadosComandoRiego.Completado, StringComparison.OrdinalIgnoreCase))
+            {
+                if (comando.Estado != EstadosComandoRiego.Completado)
+                {
+                    comando.Estado = EstadosComandoRiego.Completado;
+                    comando.FechaConfirmacion ??= ahora;
+                    comando.FechaFinalizacion = ahora;
+                    agregarEventoFinal = true;
+                    tipoEventoFinal = "RIEGO_COMPLETADO";
+                    descripcionFinal = $"Orden #{comando.IdComandoRiego} completada y confirmada por '{codigo}' ({comando.DuracionSeg}s).";
+                }
+            }
+            else if (estadoSolicitado.Equals(EstadosComandoRiego.Fallido, StringComparison.OrdinalIgnoreCase))
+            {
+                if (comando.Estado != EstadosComandoRiego.Fallido)
+                {
+                    comando.Estado = EstadosComandoRiego.Fallido;
+                    comando.FechaFinalizacion = ahora;
+                    agregarEventoFinal = true;
+                    tipoEventoFinal = "RIEGO_FALLIDO";
+                    descripcionFinal = $"Orden #{comando.IdComandoRiego} reportada como fallida por '{codigo}'.";
+                }
+            }
+            else
+            {
+                return BadRequest(new
+                {
+                    mensaje = "Estado no válido. Usa Confirmado, Completado o Fallido."
+                });
+            }
+
+            if (agregarEventoFinal)
+            {
+                var estado = _ram.ObtenerOCrear(comando.IdInvernadero);
+                _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
+                {
+                    IdInvernadero = comando.IdInvernadero,
+                    TipoEvento = tipoEventoFinal,
+                    Descripcion = descripcionFinal,
+                    TiempoActivacionSeg = comando.Estado == EstadosComandoRiego.Completado
+                        ? comando.DuracionSeg
+                        : 0,
+                    HumedadMomento = estado.UltimaHumedad,
+                    TemperaturaMomento = estado.UltimaTemperatura,
+                    FechaHora = ahora,
+                    Leida = false
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                comando.IdComandoRiego,
+                comando.Estado,
+                comando.FechaConfirmacion,
+                comando.FechaFinalizacion
             });
         }
 

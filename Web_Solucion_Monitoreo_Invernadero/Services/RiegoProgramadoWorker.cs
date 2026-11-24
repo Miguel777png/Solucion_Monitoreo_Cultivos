@@ -41,13 +41,39 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+            var comandosVencidos = await db.ComandosRiego
+                .Where(c =>
+                    (c.Estado == EstadosComandoRiego.Pendiente ||
+                     c.Estado == EstadosComandoRiego.Entregado ||
+                     c.Estado == EstadosComandoRiego.Confirmado) &&
+                    c.FechaExpiracion <= ahora)
+                .ToListAsync(ct);
+
+            foreach (var comandoVencido in comandosVencidos)
+            {
+                comandoVencido.Estado = EstadosComandoRiego.Expirado;
+                comandoVencido.FechaFinalizacion = ahora;
+
+                db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
+                {
+                    IdInvernadero = comandoVencido.IdInvernadero,
+                    TipoEvento = "RIEGO_EXPIRADO",
+                    Descripcion = $"Orden #{comandoVencido.IdComandoRiego} expirada sin confirmación del ESP32.",
+                    TiempoActivacionSeg = 0,
+                    HumedadMomento = 0,
+                    TemperaturaMomento = 0,
+                    FechaHora = ahora,
+                    Leida = false
+                });
+            }
+
             var horariosActivos = await db.CalendarioRiego
                 .Include(c => c.Invernadero)
                     .ThenInclude(i => i!.Planta)
                 .Where(c => c.State && c.Invernadero != null && c.Invernadero.State && c.Invernadero.Planta != null)
                 .ToListAsync(ct);
 
-            bool huboCambiosBd = false;
+            bool huboCambiosBd = comandosVencidos.Count > 0;
 
             foreach (var horario in horariosActivos)
             {
@@ -64,76 +90,94 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                 if (!coincideFecha && !coincideDia)
                     continue;
 
-                int idInv = horario.IdInvernadero;
-                var estadoRam = _ram.ObtenerOCrear(idInv);
+                string claveIdempotencia = $"CAL-{horario.IdCalendarioRiego}-{claveMinutoActual}";
+                bool ordenYaCreada = await db.ComandosRiego
+                    .AnyAsync(c => c.ClaveIdempotencia == claveIdempotencia, ct);
 
-                if (estadoRam.UltimoMinutoEvaluadoCalendario == claveMinutoActual)
+                if (ordenYaCreada)
                     continue;
 
-                estadoRam.UltimoMinutoEvaluadoCalendario = claveMinutoActual;
+                int idInv = horario.IdInvernadero;
+                var estadoRam = _ram.ObtenerOCrear(idInv);
 
                 var planta = horario.Invernadero!.Planta!;
                 decimal humedadActual = estadoRam.UltimaHumedad;
                 decimal humedadMinima = planta.HumedadMinima;
                 decimal humedadOptima = (planta.HumedadMinima + planta.HumedadMaxima) / 2m;
 
-                if (estadoRam.SensorConectado && humedadActual >= humedadOptima)
-                {
-                    // ZONA ÓPTIMA: Pospone el riego completo y ejecuta riego reducido de 20 segundos
-                    horario.PospuestoHasta = DateOnly.FromDateTime(ahora.AddHours(2));
-                    estadoRam.RiegoProgramadoPendiente = true;
-                    estadoRam.SegundosRiegoProgramado = 20;
+                string estadoComando = EstadosComandoRiego.Pendiente;
+                string tipoEvento;
+                string detalle;
+                int duracionSeg;
+                int prioridad;
 
-                    db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
-                    {
-                        IdInvernadero = idInv,
-                        TipoEvento = "RIEGO_REDUCIDO",
-                        Descripcion = $"[{planta.Nombre}] Riego programado ({ahora:HH:mm}) pospuesto por humedad óptima ({humedadActual}% >= {humedadOptima:0.0}%): aplicado riego reducido de 20s.",
-                        TiempoActivacionSeg = 20,
-                        HumedadMomento = humedadActual,
-                        TemperaturaMomento = estadoRam.UltimaTemperatura,
-                        FechaHora = ahora,
-                        Leida = false
-                    });
+                if (!estadoRam.SensorConectado)
+                {
+                    estadoComando = EstadosComandoRiego.Fallido;
+                    tipoEvento = "SENSOR_SIN_DATOS";
+                    duracionSeg = horario.TiempoRiegoSeg;
+                    prioridad = 0;
+                    detalle = $"[{planta.Nombre}] Horario {ahora:HH:mm} omitido: sensor sin datos recientes. No se creó una orden de riego para el ESP32.";
                 }
-                else if (estadoRam.SensorConectado && humedadActual < humedadMinima)
+                else if (humedadActual >= humedadOptima)
                 {
-                    // BAJO EL MÍNIMO: Alerta crítica y riego de emergencia de 3 minutos (180 seg)
-                    horario.PospuestoHasta = null;
-                    estadoRam.RiegoProgramadoPendiente = true;
-                    estadoRam.SegundosRiegoProgramado = 180;
-
-                    db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
-                    {
-                        IdInvernadero = idInv,
-                        TipoEvento = "RIEGO_EMERGENCIA",
-                        Descripcion = $"[{planta.Nombre}] Horario programado ({ahora:HH:mm}) coincidió con humedad crítica ({humedadActual}% < {humedadMinima}%): alerta y riego de 3 min (180s).",
-                        TiempoActivacionSeg = 180,
-                        HumedadMomento = humedadActual,
-                        TemperaturaMomento = estadoRam.UltimaTemperatura,
-                        FechaHora = ahora,
-                        Leida = false
-                    });
+                    tipoEvento = "RIEGO_REDUCIDO_PENDIENTE";
+                    duracionSeg = 20;
+                    prioridad = 25;
+                    detalle = $"[{planta.Nombre}] Orden reducida de 20s creada; humedad óptima ({humedadActual}%).";
+                }
+                else if (humedadActual < humedadMinima)
+                {
+                    tipoEvento = "RIEGO_EMERGENCIA_PENDIENTE";
+                    duracionSeg = 180;
+                    prioridad = 100;
+                    detalle = $"[{planta.Nombre}] Orden de emergencia de 180s creada; humedad {humedadActual}% < {humedadMinima}%.";
                 }
                 else
                 {
-                    // ENTRE MÍNIMO Y ÓPTIMO (o sin lectura activa): Ejecuta el riego programado normal
-                    horario.PospuestoHasta = null;
-                    estadoRam.RiegoProgramadoPendiente = true;
-                    estadoRam.SegundosRiegoProgramado = horario.TiempoRiegoSeg;
-
-                    db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
-                    {
-                        IdInvernadero = idInv,
-                        TipoEvento = "RIEGO_PROGRAMADO",
-                        Descripcion = $"[{planta.Nombre}] Riego programado ejecutado ({ahora:HH:mm}) durante {horario.TiempoRiegoSeg}s (humedad {humedadActual}% bajo óptimo {humedadOptima:0.0}%).",
-                        TiempoActivacionSeg = horario.TiempoRiegoSeg,
-                        HumedadMomento = humedadActual,
-                        TemperaturaMomento = estadoRam.UltimaTemperatura,
-                        FechaHora = ahora,
-                        Leida = false
-                    });
+                    tipoEvento = "RIEGO_PROGRAMADO_PENDIENTE";
+                    duracionSeg = horario.TiempoRiegoSeg;
+                    prioridad = 50;
+                    detalle = $"[{planta.Nombre}] Orden programada de {duracionSeg}s creada; humedad {humedadActual}%.";
                 }
+
+                horario.PospuestoHasta = null;
+
+                db.ComandosRiego.Add(new ComandoRiego
+                {
+                    IdInvernadero = idInv,
+                    IdCalendarioRiego = horario.IdCalendarioRiego,
+                    Estado = estadoComando,
+                    DuracionSeg = duracionSeg,
+                    Prioridad = prioridad,
+                    ClaveIdempotencia = claveIdempotencia,
+                    FechaCreacion = ahora,
+                    FechaExpiracion = estadoComando == EstadosComandoRiego.Pendiente
+                        ? ahora.AddMinutes(5)
+                        : ahora,
+                    FechaFinalizacion = estadoComando == EstadosComandoRiego.Fallido
+                        ? ahora
+                        : null,
+                    Detalle = detalle
+                });
+
+                db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
+                {
+                    IdInvernadero = idInv,
+                    TipoEvento = tipoEvento,
+                    Descripcion = detalle,
+                    TiempoActivacionSeg = estadoComando == EstadosComandoRiego.Pendiente
+                        ? duracionSeg
+                        : 0,
+                    HumedadMomento = humedadActual,
+                    TemperaturaMomento = estadoRam.UltimaTemperatura,
+                    FechaHora = ahora,
+                    Leida = false
+                });
+
+                // Una fecha específica representa una sola ocurrencia.
+                if (horario.FechaEspecifica.HasValue)
+                    horario.State = false;
 
                 huboCambiosBd = true;
             }
