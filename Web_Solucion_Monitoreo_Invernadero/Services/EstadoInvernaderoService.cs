@@ -22,7 +22,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         public bool SensorConectado => (DateTime.Now - UltimaActualizacion).TotalSeconds <= 25;
 
         public DateTime UltimoGuardadoHistorico { get; set; } = DateTime.MinValue;
-        public DateTime UltimaAlertaCritica { get; set; } = DateTime.MinValue;
+        public DateTime UltimoRiegoEmergencia { get; set; } = DateTime.MinValue;
+        public DateTime UltimaAlertaUmbral { get; set; } = DateTime.MinValue;
 
         // Control de riego programado desde BackgroundService
         public bool RiegoProgramadoPendiente { get; set; } = false;

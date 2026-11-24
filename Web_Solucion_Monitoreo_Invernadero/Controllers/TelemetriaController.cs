@@ -80,54 +80,78 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             estadoRam.RegistrarLectura(datos.Humedad, datos.Temperatura);
 
-            // En tiempo real: SOLO se dispara riego de emergencia si baja del mínimo (peligro) o sube mucho la temperatura.
-            // Si está entre el mínimo y el óptimo, se espera a que actúe el Calendario Programado.
-            bool peligroCritico = datos.Humedad < estadoRam.HumedadMinima || datos.Temperatura > estadoRam.TemperaturaMaxima;
-            bool alertaSinRiego = datos.Humedad > estadoRam.HumedadMaxima || datos.Temperatura < estadoRam.TemperaturaMinima;
+            // Cada variable ambiental controla un actuador distinto. La temperatura
+            // nunca activa la regadera: alta = ventilación, baja = calefacción.
+            bool humedadBaja = datos.Humedad < estadoRam.HumedadMinima;
+            bool humedadAlta = datos.Humedad > estadoRam.HumedadMaxima;
+            bool activarVentilacion = datos.Temperatura > estadoRam.TemperaturaMaxima;
+            bool activarCalefaccion = datos.Temperatura < estadoRam.TemperaturaMinima;
 
             bool activarRegadera = false;
             int segundosAEncender = 0;
+            DateTime ahora = DateTime.Now;
 
-            if (peligroCritico || alertaSinRiego)
+            // Evita superponer pulsos de emergencia de tres minutos. Una alerta de
+            // temperatura no altera este temporizador ni puede impedir un riego.
+            if (humedadBaja &&
+                (ahora - estadoRam.UltimoRiegoEmergencia).TotalSeconds >= 180)
             {
-                if ((DateTime.Now - estadoRam.UltimaAlertaCritica).TotalMinutes >= 1)
+                activarRegadera = true;
+                segundosAEncender = 180;
+                estadoRam.UltimoRiegoEmergencia = ahora;
+
+                string climatizacion = activarVentilacion
+                    ? " Ventilación activada por temperatura alta."
+                    : activarCalefaccion
+                        ? " Calefacción activada por temperatura baja."
+                        : string.Empty;
+
+                _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
                 {
-                    estadoRam.UltimaAlertaCritica = DateTime.Now;
+                    IdInvernadero = idInv,
+                    TipoEvento = "RIEGO_EMERGENCIA",
+                    Descripcion = $"[{planta.Nombre}] Humedad baja ({datos.Humedad}% < {planta.HumedadMinima}%): riego de emergencia 3 min (180s).{climatizacion}",
+                    TiempoActivacionSeg = 180,
+                    HumedadMomento = datos.Humedad,
+                    TemperaturaMomento = datos.Temperatura,
+                    FechaHora = ahora,
+                    Leida = false
+                });
 
-                    if (peligroCritico)
-                    {
-                        activarRegadera = true;
-                        segundosAEncender = 180; // 3 minutos de riego de emergencia
+                huboCambiosBd = true;
+            }
 
-                        _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
-                        {
-                            IdInvernadero = idInv,
-                            TipoEvento = "RIEGO_EMERGENCIA",
-                            Descripcion = $"[{planta.Nombre}] ALERTA (< Mín {planta.HumedadMinima}%): Riego de emergencia 3 min (180s). Hum: {datos.Humedad}% | Temp: {datos.Temperatura}°C",
-                            TiempoActivacionSeg = 180,
-                            HumedadMomento = datos.Humedad,
-                            TemperaturaMomento = datos.Temperatura,
-                            FechaHora = DateTime.Now,
-                            Leida = false
-                        });
-                    }
-                    else
-                    {
-                        _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
-                        {
-                            IdInvernadero = idInv,
-                            TipoEvento = "ALERTA_UMBRAL",
-                            Descripcion = $"[{planta.Nombre}] Fuera de rango óptimo (Sin riego): Humedad {datos.Humedad}% / Temp {datos.Temperatura}°C",
-                            TiempoActivacionSeg = 0,
-                            HumedadMomento = datos.Humedad,
-                            TemperaturaMomento = datos.Temperatura,
-                            FechaHora = DateTime.Now,
-                            Leida = false
-                        });
-                    }
+            // Registra las condiciones que no requieren agua sin repetir la alerta
+            // en cada lectura del ESP32.
+            bool existeAlertaSinRiego = humedadAlta || activarVentilacion || activarCalefaccion;
+            if (existeAlertaSinRiego &&
+                (ahora - estadoRam.UltimaAlertaUmbral).TotalMinutes >= 1)
+            {
+                var condiciones = new List<string>();
 
-                    huboCambiosBd = true;
-                }
+                if (humedadAlta)
+                    condiciones.Add($"humedad alta ({datos.Humedad}% > {planta.HumedadMaxima}%)");
+
+                if (activarVentilacion)
+                    condiciones.Add($"temperatura alta ({datos.Temperatura}°C > {planta.TemperaturaMaxima}°C): ventilación activada");
+
+                if (activarCalefaccion)
+                    condiciones.Add($"temperatura baja ({datos.Temperatura}°C < {planta.TemperaturaMinima}°C): calefacción activada");
+
+                _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
+                {
+                    IdInvernadero = idInv,
+                    TipoEvento = "ALERTA_UMBRAL",
+                    Descripcion = $"[{planta.Nombre}] {string.Join("; ", condiciones)}. Sin riego por temperatura.",
+                    TiempoActivacionSeg = 0,
+                    HumedadMomento = datos.Humedad,
+                    TemperaturaMomento = datos.Temperatura,
+                    FechaHora = ahora,
+                    Leida = false
+                });
+
+                estadoRam.UltimaAlertaUmbral = ahora;
+                huboCambiosBd = true;
             }
 
             // Guardado histórico periódico en MySQL
@@ -151,18 +175,27 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 await _db.SaveChangesAsync();
             }
 
-            // Si el RiegoProgramadoWorker dejó un riego listo, toma prioridad sobre el pulso actual
+            // El riego programado solo se entrega si no se acaba de ordenar un
+            // riego de emergencia. En caso contrario queda cubierto por esos 180s.
             if (estadoRam.RiegoProgramadoPendiente)
             {
-                activarRegadera = true;
-                segundosAEncender = estadoRam.SegundosRiegoProgramado;
+                if (!activarRegadera)
+                {
+                    activarRegadera = true;
+                    segundosAEncender = estadoRam.SegundosRiegoProgramado;
+                }
+
                 estadoRam.RiegoProgramadoPendiente = false;
             }
 
             return Ok(new
             {
                 activarRegadera = activarRegadera,
-                tiempoSeg = segundosAEncender
+                tiempoSeg = segundosAEncender,
+                activarVentilacion = activarVentilacion,
+                activarCalefaccion = activarCalefaccion,
+                temperaturaMinima = planta.TemperaturaMinima,
+                temperaturaMaxima = planta.TemperaturaMaxima
             });
         }
 

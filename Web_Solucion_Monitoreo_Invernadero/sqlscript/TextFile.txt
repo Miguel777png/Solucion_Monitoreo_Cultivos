@@ -44,7 +44,7 @@ CREATE TABLE invernaderos (
 -- 4. SENSORES / ARDUINOS ESP32 (1 dispositivo dedicado por cada invernadero = 3 en total)
 CREATE TABLE sensores (
     id_sensor INT AUTO_INCREMENT PRIMARY KEY,
-    id_invernadero INT NOT NULL UNIQUE,
+    id_invernadero INT UNIQUE,
     codigo_dispositivo VARCHAR(50) NOT NULL UNIQUE,
     nombre_nodo VARCHAR(100) NOT NULL,
     estado_conexion VARCHAR(30) NOT NULL DEFAULT 'Desconectado',
