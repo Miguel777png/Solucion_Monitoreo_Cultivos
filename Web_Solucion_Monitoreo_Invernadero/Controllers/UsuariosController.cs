@@ -9,6 +9,15 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+    /// Controlador exclusivo para administradores destinado a la gestión de cuentas de usuario.
+    /// Permite listar, crear y editar operadores y administradores, validando la unicidad de nombre
+    /// y correo electrónico, gestionando roles y estados de activación, e impidiendo que el usuario
+    /// autenticado modifique su propia cuenta durante la sesión activa.
+    /// 
+
+    //
+
     [Authorize(Roles = "Administrador")]
     public class UsuariosController : Controller
     {

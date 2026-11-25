@@ -4,6 +4,13 @@ using Web_Solucion_Monitoreo_Invernadero.Models;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Services
 {
+
+    /// Servicio en segundo plano (BackgroundService) que se ejecuta cada 20 segundos para gestionar
+    /// el ciclo de vida de las órdenes de riego y evaluar los horarios programados activos.
+    /// Marca como expiradas las órdenes no confirmadas a tiempo, valida la conexión del sensor y
+    /// los umbrales botánicos de la planta antes de emitir nuevas órdenes idempotentes, desactiva
+    /// agendas de fecha única ya procesadas y registra cada resultado en la bitácora del sistema.
+
     public class RiegoProgramadoWorker : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;

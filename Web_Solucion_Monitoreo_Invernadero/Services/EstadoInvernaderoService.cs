@@ -4,12 +4,21 @@ using System.Collections.Generic;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Services
 {
+
+    /// Representa una muestra puntual de humedad y temperatura con marca de hora
+    /// utilizada para alimentar los gráficos en tiempo real de la interfaz web.
+
     public class PuntoGrafico
     {
         public string Hora { get; set; } = string.Empty;
         public decimal Humedad { get; set; }
         public decimal Temperatura { get; set; }
     }
+
+    /// Contenedor sincronizado (thread-safe) del estado operativo en memoria RAM de un invernadero.
+    /// Almacena las últimas lecturas ambientales, el estado de conexión del sensor, una cola circular
+    /// de hasta 40 puntos para Chart.js y los umbrales de la especie asignada, evaluando en tiempo
+    /// real la activación de ventilación, calefacción y riego de emergencia continuo.
 
     public class EstadoInvernadero
     {
@@ -106,6 +115,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             }
         }
     }
+
+    /// Servicio singleton que centraliza y administra en memoria RAM los estados en vivo de todos
+    /// los invernaderos mediante un diccionario concurrente, desacoplando la telemetría de alta
+    /// frecuencia de las escrituras periódicas en la base de datos.
 
     public class EstadoInvernaderoService
     {
