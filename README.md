@@ -274,8 +274,8 @@ const char* password = "";
 // ServerURL DEBE APUNTAR con la ruta /api/telemetria
 // ServerURL DEBE APUNTAR con la ruta /api/telemetria/comandos/confirmar
 
-const char* serverUrl = "[https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria";
-const char* confirmarComandoUrl = "[https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar";
+const char* serverUrl = "https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria";
+const char* confirmarComandoUrl = "https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar";
 const char* CODIGO_DISPOSITIVO = "ESP32-ORQ-01";
 
 DHT dht(DHT_PIN, DHT_TYPE);
