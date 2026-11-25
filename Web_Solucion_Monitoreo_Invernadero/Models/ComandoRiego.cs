@@ -11,6 +11,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         public const string Completado = "Completado";
         public const string Expirado = "Expirado";
         public const string Fallido = "Fallido";
+        public const string Omitido = "Omitido";
     }
 
     [Table("comandos_riego")]

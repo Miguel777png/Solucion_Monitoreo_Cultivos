@@ -62,12 +62,24 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             string nombre,
             string? descripcion,
             string temperaturaMinima,
+            string? temperaturaOptima,
             string temperaturaMaxima,
             string humedadMinima,
+            string? humedadOptima,
             string humedadMaxima)
         {
-            if (!TryParsearUmbrales(temperaturaMinima, temperaturaMaxima, humedadMinima, humedadMaxima,
-                out decimal tMin, out decimal tMax, out decimal hMin, out decimal hMax, out string error))
+            if (string.IsNullOrWhiteSpace(nombre))
+            {
+                TempData["MensajeError"] = "El nombre de la especie es obligatorio.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!TryParsearUmbrales(
+                temperaturaMinima, temperaturaOptima, temperaturaMaxima,
+                humedadMinima, humedadOptima, humedadMaxima,
+                out decimal tMin, out decimal tOpt, out decimal tMax,
+                out decimal hMin, out decimal hOpt, out decimal hMax,
+                out string error))
             {
                 TempData["MensajeError"] = error;
                 return RedirectToAction(nameof(Index));
@@ -80,8 +92,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 Nombre = nombre.Trim(),
                 Descripcion = descripcion?.Trim(),
                 TemperaturaMinima = tMin,
+                TemperaturaOptima = tOpt,
                 TemperaturaMaxima = tMax,
                 HumedadMinima = hMin,
+                HumedadOptima = hOpt,
                 HumedadMaxima = hMax,
                 IdUsuarioCreacion = idUsuario,
                 FechaActualizacion = DateTime.Now,
@@ -94,7 +108,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             await _auditoria.RegistrarAsync(
                 "CREAR_PLANTA",
                 "Plantas",
-                $"Ingresó la planta '{nueva.Nombre}' (Temp: {tMin}-{tMax}°C, Hum: {hMin}-{hMax}%)."
+                $"Ingresó la planta '{nueva.Nombre}' (Temp: {tMin}/{tOpt}/{tMax}°C, Hum: {hMin}/{hOpt}/{hMax}%)."
             );
 
             TempData["MensajeExito"] = $"Planta '{nueva.Nombre}' agregada al catálogo por Usuario ID #{idUsuario}.";
@@ -110,33 +124,47 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             string nombre,
             string? descripcion,
             string temperaturaMinima,
+            string? temperaturaOptima,
             string temperaturaMaxima,
             string humedadMinima,
+            string? humedadOptima,
             string humedadMaxima)
         {
             var planta = await _db.Plantas.FindAsync(idPlanta);
             if (planta == null) return RedirectToAction(nameof(Index));
 
-            if (!TryParsearUmbrales(temperaturaMinima, temperaturaMaxima, humedadMinima, humedadMaxima,
-                out decimal tMin, out decimal tMax, out decimal hMin, out decimal hMax, out string error))
+            if (string.IsNullOrWhiteSpace(nombre))
+            {
+                TempData["MensajeError"] = "El nombre de la especie es obligatorio.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!TryParsearUmbrales(
+                temperaturaMinima, temperaturaOptima, temperaturaMaxima,
+                humedadMinima, humedadOptima, humedadMaxima,
+                out decimal tMin, out decimal tOpt, out decimal tMax,
+                out decimal hMin, out decimal hOpt, out decimal hMax,
+                out string error))
             {
                 TempData["MensajeError"] = error;
                 return RedirectToAction(nameof(Index));
             }
 
-            string estadoAnterior = $"{planta.Nombre} (Temp: {planta.TemperaturaMinima}-{planta.TemperaturaMaxima}°C, Hum: {planta.HumedadMinima}-{planta.HumedadMaxima}%)";
+            string estadoAnterior = $"{planta.Nombre} (Temp: {planta.TemperaturaMinima}/{planta.TemperaturaOptima}/{planta.TemperaturaMaxima}°C, Hum: {planta.HumedadMinima}/{planta.HumedadOptima}/{planta.HumedadMaxima}%)";
 
             planta.Nombre = nombre.Trim();
             planta.Descripcion = descripcion?.Trim();
             planta.TemperaturaMinima = tMin;
+            planta.TemperaturaOptima = tOpt;
             planta.TemperaturaMaxima = tMax;
             planta.HumedadMinima = hMin;
+            planta.HumedadOptima = hOpt;
             planta.HumedadMaxima = hMax;
             planta.FechaActualizacion = DateTime.Now;
 
             await _db.SaveChangesAsync();
 
-            string estadoNuevo = $"{planta.Nombre} (Temp: {tMin}-{tMax}°C, Hum: {hMin}-{hMax}%)";
+            string estadoNuevo = $"{planta.Nombre} (Temp: {tMin}/{tOpt}/{tMax}°C, Hum: {hMin}/{hOpt}/{hMax}%)";
 
             await _auditoria.RegistrarAsync(
                 "EDITAR_PLANTA",
@@ -182,27 +210,51 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
         // NORMALIZADOR DECIMAL SEGURO (SOPORTA COMA Y PUNTO SIN MULTIPLICAR POR 10/100)
         private static bool TryParsearUmbrales(
-            string sTMin, string sTMax, string sHMin, string sHMax,
-            out decimal tMin, out decimal tMax, out decimal hMin, out decimal hMax,
+            string sTMin, string? sTOpt, string sTMax,
+            string sHMin, string? sHOpt, string sHMax,
+            out decimal tMin, out decimal tOpt, out decimal tMax,
+            out decimal hMin, out decimal hOpt, out decimal hMax,
             out string error)
         {
-            tMin = tMax = hMin = hMax = 0;
+            tMin = tOpt = tMax = hMin = hOpt = hMax = 0;
             error = string.Empty;
 
             bool ok1 = decimal.TryParse(sTMin?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out tMin);
-            bool ok2 = decimal.TryParse(sTMax?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out tMax);
-            bool ok3 = decimal.TryParse(sHMin?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hMin);
-            bool ok4 = decimal.TryParse(sHMax?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hMax);
+            bool ok3 = decimal.TryParse(sTMax?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out tMax);
+            bool ok4 = decimal.TryParse(sHMin?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hMin);
+            bool ok6 = decimal.TryParse(sHMax?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hMax);
 
-            if (!ok1 || !ok2 || !ok3 || !ok4)
+            if (!ok1 || !ok3 || !ok4 || !ok6)
             {
                 error = "Formato numérico inválido en los umbrales.";
                 return false;
             }
 
+            tMin = Math.Round(tMin, 2);
+            tMax = Math.Round(tMax, 2);
+            hMin = Math.Round(hMin, 2);
+            hMax = Math.Round(hMax, 2);
+
             if (tMin < -10 || tMax > 60 || tMin >= tMax)
             {
                 error = "La temperatura debe estar entre -10°C y 60°C, y la mínima debe ser menor que la máxima.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(sTOpt))
+            {
+                tOpt = Math.Round((tMin + tMax) / 2m, 2);
+            }
+            else if (!decimal.TryParse(sTOpt.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out tOpt))
+            {
+                error = "El inicio del rango óptimo de temperatura tiene un formato inválido.";
+                return false;
+            }
+
+            tOpt = Math.Round(tOpt, 2);
+            if (tOpt < tMin || tOpt >= tMax)
+            {
+                error = "El inicio del rango óptimo de temperatura debe ser mayor o igual al mínimo y menor que el máximo.";
                 return false;
             }
 
@@ -212,10 +264,23 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 return false;
             }
 
-            tMin = Math.Round(tMin, 2);
-            tMax = Math.Round(tMax, 2);
-            hMin = Math.Round(hMin, 2);
-            hMax = Math.Round(hMax, 2);
+            if (string.IsNullOrWhiteSpace(sHOpt))
+            {
+                hOpt = Math.Round((hMin + hMax) / 2m, 2);
+            }
+            else if (!decimal.TryParse(sHOpt.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out hOpt))
+            {
+                error = "El inicio del rango óptimo de humedad tiene un formato inválido.";
+                return false;
+            }
+
+            hOpt = Math.Round(hOpt, 2);
+            if (hOpt < hMin || hOpt >= hMax)
+            {
+                error = "El inicio del rango óptimo de humedad debe ser mayor o igual al mínimo y menor que el máximo.";
+                return false;
+            }
+
             return true;
         }
     }

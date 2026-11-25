@@ -12,19 +12,25 @@ CREATE TABLE usuarios (
     state TINYINT(1) NOT NULL DEFAULT 1
 );
 
--- 2. PLANTAS (Cada especie tiene sus 4 umbrales y registra qué usuario la ingresó)
+-- 2. PLANTAS (El valor óptimo marca el inicio del rango óptimo [óptimo, máximo))
 CREATE TABLE plantas (
     id_planta INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     descripcion VARCHAR(255) NULL,
     temperatura_minima DECIMAL(5,2) NOT NULL,
+    temperatura_optima DECIMAL(5,2) NOT NULL,
     temperatura_maxima DECIMAL(5,2) NOT NULL,
     humedad_minima DECIMAL(5,2) NOT NULL,
+    humedad_optima DECIMAL(5,2) NOT NULL,
     humedad_maxima DECIMAL(5,2) NOT NULL,
     id_usuario_creacion INT NOT NULL,
     fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     state TINYINT(1) NOT NULL DEFAULT 1,
-    CONSTRAINT fk_planta_usuario FOREIGN KEY (id_usuario_creacion) REFERENCES usuarios(id_usuario)
+    CONSTRAINT fk_planta_usuario FOREIGN KEY (id_usuario_creacion) REFERENCES usuarios(id_usuario),
+    CONSTRAINT chk_planta_temperatura_optima
+        CHECK (temperatura_optima >= temperatura_minima AND temperatura_optima < temperatura_maxima),
+    CONSTRAINT chk_planta_humedad_optima
+        CHECK (humedad_optima >= humedad_minima AND humedad_optima < humedad_maxima)
 );
 
 -- 3. INVERNADEROS (3 sectores; relación estricta 1:1 con planta mediante UNIQUE)
@@ -155,10 +161,10 @@ INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES
 ('Operador Agrónomo', 'operador@invernadero.cl', '123456', 'Operador');
 
 -- 3 especies iniciales (cada una asignada a un invernadero distinto en relación 1:1)
-INSERT INTO plantas (nombre, descripcion, temperatura_minima, temperatura_maxima, humedad_minima, humedad_maxima, id_usuario_creacion) VALUES
-('Orquídea Phalaenopsis', 'Orquídea mariposa tropical, requiere alta humedad ambiental.', 18.00, 24.00, 75.00, 85.00, 1),
-('Orquídea Cattleya', 'Requiere mayor luminosidad y temperatura ligeramente más cálida.', 20.00, 28.00, 60.00, 75.00, 1),
-('Orquídea Cymbidium', 'Especie de clima fresco con menor exigencia de humedad.', 12.00, 20.00, 50.00, 65.00, 1);
+INSERT INTO plantas (nombre, descripcion, temperatura_minima, temperatura_optima, temperatura_maxima, humedad_minima, humedad_optima, humedad_maxima, id_usuario_creacion) VALUES
+('Orquídea Phalaenopsis', 'Orquídea mariposa tropical, requiere alta humedad ambiental.', 18.00, 21.00, 24.00, 75.00, 80.00, 85.00, 1),
+('Orquídea Cattleya', 'Requiere mayor luminosidad y temperatura ligeramente más cálida.', 20.00, 24.00, 28.00, 60.00, 67.50, 75.00, 1),
+('Orquídea Cymbidium', 'Especie de clima fresco con menor exigencia de humedad.', 12.00, 16.00, 20.00, 50.00, 57.50, 65.00, 1);
 
 -- 3 invernaderos (cada uno con su planta única)
 INSERT INTO invernaderos (nombre, ubicacion, id_planta, frecuencia_registro_min, id_usuario_modificacion) VALUES

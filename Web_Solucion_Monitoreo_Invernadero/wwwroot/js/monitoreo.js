@@ -52,14 +52,18 @@ function mostrarNotificacionFlotante(alerta) {
         cabeceraClase = 'bg-danger text-white';
         icono = '🚨';
         titulo = 'Alerta Crítica — Riego 3 min (180s)';
-    } else if (alerta.tipoEvento === 'RIEGO_REDUCIDO') {
+    } else if (alerta.tipoEvento === 'RIEGO_OMITIDO_RANGO_OPTIMO') {
         cabeceraClase = 'bg-success text-white';
         icono = '🌿';
-        titulo = 'Humedad Óptima — Riego Reducido (20s)';
-    } else if (alerta.tipoEvento === 'RIEGO_PROGRAMADO') {
+        titulo = 'Rango óptimo — Riego omitido';
+    } else if (alerta.tipoEvento === 'RIEGO_EMERGENCIA_FINALIZADO') {
+        cabeceraClase = 'bg-success text-white';
+        icono = '✓';
+        titulo = 'Humedad recuperada — Válvula cerrada';
+    } else if (alerta.tipoEvento === 'RIEGO_PROGRAMADO_PENDIENTE') {
         cabeceraClase = 'bg-primary text-white';
         icono = '💧';
-        titulo = 'Riego Programado Activado';
+        titulo = 'Riego programado pendiente';
     } else if (alerta.tipoEvento === 'ALERTA_UMBRAL') {
         cabeceraClase = 'bg-info text-dark';
         icono = '🌡️';
@@ -107,7 +111,7 @@ function actualizarIndicadorSaludPrincipal(estadoSalud) {
         badgeSalud.textContent = '✔ Condiciones Óptimas';
     } else if (estadoSalud === 'PRECAUCION') {
         badgeSalud.className = 'badge bg-warning-subtle text-warning-emphasis border border-warning fs-6 px-3 py-1';
-        badgeSalud.textContent = '⚠ Precaución: Margen Mínimo';
+        badgeSalud.textContent = '⚠ Condiciones aceptables, fuera del rango óptimo';
     } else if (estadoSalud === 'PELIGRO') {
         badgeSalud.className = 'badge bg-danger-subtle text-danger border border-danger fs-6 px-3 py-1';
         badgeSalud.textContent = '🚨 Alerta: Fuera de Umbral';
@@ -119,7 +123,7 @@ function actualizarIndicadorSaludPrincipal(estadoSalud) {
 
 function obtenerIconoMiniSalud(estadoSalud) {
     if (estadoSalud === 'OPTIMO') return '<span class="text-success fw-bold" title="Óptimo">✔</span>';
-    if (estadoSalud === 'PRECAUCION') return '<span class="text-warning fw-bold" title="Precaución: Margen mínimo">⚠</span>';
+    if (estadoSalud === 'PRECAUCION') return '<span class="text-warning fw-bold" title="Aceptable, fuera del rango óptimo">⚠</span>';
     if (estadoSalud === 'PELIGRO') return '<span class="text-danger fw-bold" title="Alerta: Fuera de umbral">🚨</span>';
     return '<span class="text-muted">•</span>';
 }
@@ -283,8 +287,10 @@ async function actualizarDashboard(idInvernadero) {
                     ul.innerHTML = alertas.map(item => {
                         let color = 'bg-info text-dark';
                         if (item.tipoEvento === 'RIEGO_EMERGENCIA') color = 'bg-danger';
-                        else if (item.tipoEvento === 'RIEGO_REDUCIDO') color = 'bg-success';
-                        else if (item.tipoEvento === 'RIEGO_PROGRAMADO') color = 'bg-primary';
+                        else if (item.tipoEvento === 'RIEGO_EMERGENCIA_FINALIZADO') color = 'bg-success';
+                        else if (item.tipoEvento === 'RIEGO_OMITIDO_RANGO_OPTIMO') color = 'bg-success';
+                        else if (item.tipoEvento === 'RIEGO_OMITIDO_PROTECCION') color = 'bg-warning text-dark';
+                        else if (item.tipoEvento === 'RIEGO_PROGRAMADO_PENDIENTE') color = 'bg-primary';
                         else if (item.tipoEvento === 'RIEGO_POSPUESTO') color = 'bg-secondary';
 
                         return `

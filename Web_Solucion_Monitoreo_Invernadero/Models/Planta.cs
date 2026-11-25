@@ -30,12 +30,20 @@ namespace Web_Solucion_Monitoreo_Invernadero.Models
         public decimal TemperaturaMaxima { get; set; }
 
         [Required]
+        [Column("temperatura_optima", TypeName = "decimal(5,2)")]
+        public decimal TemperaturaOptima { get; set; }
+
+        [Required]
         [Column("humedad_minima", TypeName = "decimal(5,2)")]
         public decimal HumedadMinima { get; set; }
 
         [Required]
         [Column("humedad_maxima", TypeName = "decimal(5,2)")]
         public decimal HumedadMaxima { get; set; }
+
+        [Required]
+        [Column("humedad_optima", TypeName = "decimal(5,2)")]
+        public decimal HumedadOptima { get; set; }
 
         [Required]
         [Column("id_usuario_creacion")]

@@ -65,8 +65,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             estadoRam.FrecuenciaRegistroMin = sensor.Invernadero.FrecuenciaRegistroMin;
             estadoRam.TemperaturaMaxima = planta.TemperaturaMaxima;
             estadoRam.TemperaturaMinima = planta.TemperaturaMinima;
+            estadoRam.TemperaturaOptima = planta.TemperaturaOptima;
             estadoRam.HumedadMaxima = planta.HumedadMaxima;
             estadoRam.HumedadMinima = planta.HumedadMinima;
+            estadoRam.HumedadOptima = planta.HumedadOptima;
             estadoRam.ConfiguracionCargada = true;
 
             bool huboCambiosBd = false;
@@ -79,27 +81,23 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             sensor.UltimaSenal = DateTime.Now;
 
             estadoRam.RegistrarLectura(datos.Humedad, datos.Temperatura);
+            estadoRam.ActualizarClimatizacion(datos.Temperatura);
+            bool cambioRiegoEmergencia = estadoRam.ActualizarRiegoEmergencia(datos.Humedad);
 
             // Cada variable ambiental controla un actuador distinto. La temperatura
             // nunca activa la regadera: alta = ventilación, baja = calefacción.
-            bool humedadBaja = datos.Humedad < estadoRam.HumedadMinima;
             bool humedadAlta = datos.Humedad > estadoRam.HumedadMaxima;
-            bool activarVentilacion = datos.Temperatura > estadoRam.TemperaturaMaxima;
-            bool activarCalefaccion = datos.Temperatura < estadoRam.TemperaturaMinima;
+            bool activarVentilacion = estadoRam.VentilacionActiva;
+            bool activarCalefaccion = estadoRam.CalefaccionActiva;
 
-            bool activarRegadera = false;
+            bool activarRegadera = estadoRam.RiegoEmergenciaActivo;
             int segundosAEncender = 0;
             DateTime ahora = DateTime.Now;
 
-            // Evita superponer pulsos de emergencia de tres minutos. Una alerta de
-            // temperatura no altera este temporizador ni puede impedir un riego.
-            if (humedadBaja &&
-                (ahora - estadoRam.UltimoRiegoEmergencia).TotalSeconds >= 180)
+            // El riego de emergencia es continuo: abre al bajar del mínimo y el
+            // ESP32 lo cierra cuando una lectura vuelve al rango permitido.
+            if (cambioRiegoEmergencia && activarRegadera)
             {
-                activarRegadera = true;
-                segundosAEncender = 180;
-                estadoRam.UltimoRiegoEmergencia = ahora;
-
                 string climatizacion = activarVentilacion
                     ? " Ventilación activada por temperatura alta."
                     : activarCalefaccion
@@ -110,8 +108,24 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 {
                     IdInvernadero = idInv,
                     TipoEvento = "RIEGO_EMERGENCIA",
-                    Descripcion = $"[{planta.Nombre}] Humedad baja ({datos.Humedad}% < {planta.HumedadMinima}%): riego de emergencia 3 min (180s).{climatizacion}",
-                    TiempoActivacionSeg = 180,
+                    Descripcion = $"[{planta.Nombre}] Humedad baja ({datos.Humedad}% < {planta.HumedadMinima}%): válvula abierta hasta recuperar el rango permitido.{climatizacion}",
+                    TiempoActivacionSeg = 0,
+                    HumedadMomento = datos.Humedad,
+                    TemperaturaMomento = datos.Temperatura,
+                    FechaHora = ahora,
+                    Leida = false
+                });
+
+                huboCambiosBd = true;
+            }
+            else if (cambioRiegoEmergencia && !activarRegadera)
+            {
+                _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
+                {
+                    IdInvernadero = idInv,
+                    TipoEvento = "RIEGO_EMERGENCIA_FINALIZADO",
+                    Descripcion = $"[{planta.Nombre}] Humedad recuperada ({datos.Humedad}%): válvula cerrada al volver al rango {planta.HumedadMinima}%–{planta.HumedadMaxima}%.",
+                    TiempoActivacionSeg = 0,
                     HumedadMomento = datos.Humedad,
                     TemperaturaMomento = datos.Temperatura,
                     FechaHora = ahora,
@@ -133,16 +147,20 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                     condiciones.Add($"humedad alta ({datos.Humedad}% > {planta.HumedadMaxima}%)");
 
                 if (activarVentilacion)
-                    condiciones.Add($"temperatura alta ({datos.Temperatura}°C > {planta.TemperaturaMaxima}°C): ventilación activada");
+                    condiciones.Add($"ventilación activa hasta regresar a {planta.TemperaturaMaxima}°C o menos");
 
                 if (activarCalefaccion)
-                    condiciones.Add($"temperatura baja ({datos.Temperatura}°C < {planta.TemperaturaMinima}°C): calefacción activada");
+                    condiciones.Add($"calefacción activa hasta regresar a {planta.TemperaturaMinima}°C o más");
+
+                string detalleRiego = activarVentilacion || activarCalefaccion
+                    ? " Sin riego provocado por la temperatura."
+                    : string.Empty;
 
                 _db.BitacoraRiegoAlertas.Add(new BitacoraRiegoAlerta
                 {
                     IdInvernadero = idInv,
                     TipoEvento = "ALERTA_UMBRAL",
-                    Descripcion = $"[{planta.Nombre}] {string.Join("; ", condiciones)}. Sin riego por temperatura.",
+                    Descripcion = $"[{planta.Nombre}] {string.Join("; ", condiciones)}.{detalleRiego}",
                     TiempoActivacionSeg = 0,
                     HumedadMomento = datos.Humedad,
                     TemperaturaMomento = datos.Temperatura,
@@ -209,10 +227,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             {
                 activarRegadera = activarRegadera,
                 tiempoSeg = segundosAEncender,
+                riegoEmergenciaContinuo = estadoRam.RiegoEmergenciaActivo,
                 activarVentilacion = activarVentilacion,
                 activarCalefaccion = activarCalefaccion,
                 temperaturaMinima = planta.TemperaturaMinima,
+                temperaturaOptima = planta.TemperaturaOptima,
                 temperaturaMaxima = planta.TemperaturaMaxima,
+                humedadMinima = planta.HumedadMinima,
+                humedadOptima = planta.HumedadOptima,
+                humedadMaxima = planta.HumedadMaxima,
                 idComandoRiego = comandoRiego?.IdComandoRiego,
                 claveIdempotencia = comandoRiego?.ClaveIdempotencia,
                 fechaExpiracion = comandoRiego?.FechaExpiracion
@@ -344,25 +367,30 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
             string estadoSalud = "SIN_DATOS";
             decimal humedadOptima = 0;
+            decimal temperaturaOptima = 0;
 
             if (inv?.Planta != null && estado.SensorConectado)
             {
                 var p = inv.Planta;
-                humedadOptima = (p.HumedadMinima + p.HumedadMaxima) / 2m;
+                humedadOptima = p.HumedadOptima;
+                temperaturaOptima = p.TemperaturaOptima;
 
                 bool fueraRango = estado.UltimaHumedad < p.HumedadMinima ||
                                   estado.UltimaHumedad > p.HumedadMaxima ||
                                   estado.UltimaTemperatura < p.TemperaturaMinima ||
                                   estado.UltimaTemperatura > p.TemperaturaMaxima;
 
-                bool enMargenMinimo = estado.UltimaHumedad >= p.HumedadMinima && estado.UltimaHumedad < humedadOptima;
+                bool enRangoOptimo = estado.UltimaHumedad >= p.HumedadOptima &&
+                                     estado.UltimaHumedad < p.HumedadMaxima &&
+                                     estado.UltimaTemperatura >= p.TemperaturaOptima &&
+                                     estado.UltimaTemperatura < p.TemperaturaMaxima;
 
                 if (fueraRango)
                     estadoSalud = "PELIGRO";
-                else if (enMargenMinimo)
-                    estadoSalud = "PRECAUCION";
-                else
+                else if (enRangoOptimo)
                     estadoSalud = "OPTIMO";
+                else
+                    estadoSalud = "PRECAUCION";
             }
 
             return Ok(new
@@ -372,6 +400,7 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 humedadActual = estado.UltimaHumedad,
                 temperaturaActual = estado.UltimaTemperatura,
                 humedadOptima = humedadOptima,
+                temperaturaOptima = temperaturaOptima,
                 estadoSalud = estadoSalud,
                 ultimaHora = estado.UltimaActualizacion == DateTime.MinValue
                     ? "Sin datos"
@@ -399,20 +428,21 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 if (inv.Planta != null && est.SensorConectado)
                 {
                     var p = inv.Planta;
-                    decimal hOptima = (p.HumedadMinima + p.HumedadMaxima) / 2m;
+                    decimal hOptima = p.HumedadOptima;
 
                     if (est.UltimaHumedad < p.HumedadMinima || est.UltimaHumedad > p.HumedadMaxima ||
                         est.UltimaTemperatura < p.TemperaturaMinima || est.UltimaTemperatura > p.TemperaturaMaxima)
                     {
                         salud = "PELIGRO";
                     }
-                    else if (est.UltimaHumedad < hOptima)
+                    else if (est.UltimaHumedad >= hOptima && est.UltimaHumedad < p.HumedadMaxima &&
+                             est.UltimaTemperatura >= p.TemperaturaOptima && est.UltimaTemperatura < p.TemperaturaMaxima)
                     {
-                        salud = "PRECAUCION";
+                        salud = "OPTIMO";
                     }
                     else
                     {
-                        salud = "OPTIMO";
+                        salud = "PRECAUCION";
                     }
                 }
 

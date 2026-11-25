@@ -102,8 +102,8 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
 
                 var planta = horario.Invernadero!.Planta!;
                 decimal humedadActual = estadoRam.UltimaHumedad;
-                decimal humedadMinima = planta.HumedadMinima;
-                decimal humedadOptima = (planta.HumedadMinima + planta.HumedadMaxima) / 2m;
+                decimal temperaturaActual = estadoRam.UltimaTemperatura;
+                decimal humedadOptima = planta.HumedadOptima;
 
                 string estadoComando = EstadosComandoRiego.Pendiente;
                 string tipoEvento;
@@ -119,19 +119,24 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                     prioridad = 0;
                     detalle = $"[{planta.Nombre}] Horario {ahora:HH:mm} omitido: sensor sin datos recientes. No se creó una orden de riego para el ESP32.";
                 }
+                else if (humedadActual < planta.HumedadMinima ||
+                         humedadActual > planta.HumedadMaxima ||
+                         temperaturaActual < planta.TemperaturaMinima ||
+                         temperaturaActual > planta.TemperaturaMaxima)
+                {
+                    estadoComando = EstadosComandoRiego.Omitido;
+                    tipoEvento = "RIEGO_OMITIDO_PROTECCION";
+                    duracionSeg = horario.TiempoRiegoSeg;
+                    prioridad = 0;
+                    detalle = $"[{planta.Nombre}] Horario {ahora:HH:mm} omitido: lectura fuera del rango permitido. Humedad {humedadActual}% y temperatura {temperaturaActual}°C.";
+                }
                 else if (humedadActual >= humedadOptima)
                 {
-                    tipoEvento = "RIEGO_REDUCIDO_PENDIENTE";
-                    duracionSeg = 20;
-                    prioridad = 25;
-                    detalle = $"[{planta.Nombre}] Orden reducida de 20s creada; humedad óptima ({humedadActual}%).";
-                }
-                else if (humedadActual < humedadMinima)
-                {
-                    tipoEvento = "RIEGO_EMERGENCIA_PENDIENTE";
-                    duracionSeg = 180;
-                    prioridad = 100;
-                    detalle = $"[{planta.Nombre}] Orden de emergencia de 180s creada; humedad {humedadActual}% < {humedadMinima}%.";
+                    estadoComando = EstadosComandoRiego.Omitido;
+                    tipoEvento = "RIEGO_OMITIDO_RANGO_OPTIMO";
+                    duracionSeg = horario.TiempoRiegoSeg;
+                    prioridad = 0;
+                    detalle = $"[{planta.Nombre}] Horario {ahora:HH:mm} omitido: humedad {humedadActual}% dentro del rango que no requiere riego ({humedadOptima}%–{planta.HumedadMaxima}%).";
                 }
                 else
                 {
@@ -156,8 +161,9 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
                         ? ahora.AddMinutes(5)
                         : ahora,
                     FechaFinalizacion = estadoComando == EstadosComandoRiego.Fallido
-                        ? ahora
-                        : null,
+                        || estadoComando == EstadosComandoRiego.Omitido
+                            ? ahora
+                            : null,
                     Detalle = detalle
                 });
 

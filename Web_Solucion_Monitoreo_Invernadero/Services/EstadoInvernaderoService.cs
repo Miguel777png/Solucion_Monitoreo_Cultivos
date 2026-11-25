@@ -22,14 +22,18 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
         public bool SensorConectado => (DateTime.Now - UltimaActualizacion).TotalSeconds <= 25;
 
         public DateTime UltimoGuardadoHistorico { get; set; } = DateTime.MinValue;
-        public DateTime UltimoRiegoEmergencia { get; set; } = DateTime.MinValue;
         public DateTime UltimaAlertaUmbral { get; set; } = DateTime.MinValue;
 
         public int FrecuenciaRegistroMin { get; set; } = 60;
         public decimal TemperaturaMaxima { get; set; } = 24.00m;
         public decimal TemperaturaMinima { get; set; } = 18.00m;
+        public decimal TemperaturaOptima { get; set; } = 21.00m;
         public decimal HumedadMaxima { get; set; } = 85.00m;
         public decimal HumedadMinima { get; set; } = 75.00m;
+        public decimal HumedadOptima { get; set; } = 80.00m;
+        public bool VentilacionActiva { get; private set; }
+        public bool CalefaccionActiva { get; private set; }
+        public bool RiegoEmergenciaActivo { get; private set; }
         public bool ConfiguracionCargada { get; set; } = false;
 
         private readonly Queue<PuntoGrafico> _ultimosPuntos = new();
@@ -62,6 +66,43 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             lock (_lock)
             {
                 return new List<PuntoGrafico>(_ultimosPuntos);
+            }
+        }
+
+        public void ActualizarClimatizacion(decimal temperatura)
+        {
+            lock (_lock)
+            {
+                if (temperatura > TemperaturaMaxima)
+                {
+                    VentilacionActiva = true;
+                    CalefaccionActiva = false;
+                }
+                else if (temperatura < TemperaturaMinima)
+                {
+                    CalefaccionActiva = true;
+                    VentilacionActiva = false;
+                }
+                else
+                {
+                    VentilacionActiva = false;
+                    CalefaccionActiva = false;
+                }
+            }
+        }
+
+        public bool ActualizarRiegoEmergencia(decimal humedad)
+        {
+            lock (_lock)
+            {
+                bool estadoAnterior = RiegoEmergenciaActivo;
+
+                if (humedad < HumedadMinima)
+                    RiegoEmergenciaActivo = true;
+                else if (humedad >= HumedadMinima)
+                    RiegoEmergenciaActivo = false;
+
+                return estadoAnterior != RiegoEmergenciaActivo;
             }
         }
     }

@@ -8,7 +8,10 @@
 
     decimal hMin = Model?.Planta?.HumedadMinima ?? 0;
     decimal hMax = Model?.Planta?.HumedadMaxima ?? 0;
-    decimal hOptimaCalculada = (hMin + hMax) / 2m;
+    decimal hOptima = Model?.Planta?.HumedadOptima ?? 0;
+    decimal tMin = Model?.Planta?.TemperaturaMinima ?? 0;
+    decimal tMax = Model?.Planta?.TemperaturaMaxima ?? 0;
+    decimal tOptima = Model?.Planta?.TemperaturaOptima ?? 0;
 }
 
 <div id="monitor-app" data-invernadero-id="@idActual" class="container py-3">
@@ -101,18 +104,18 @@
     <!-- 3. KPIs EN TIEMPO REAL -->
     <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="card border-primary shadow-sm h-100">
+            <div class="card environment-kpi environment-kpi--humidity h-100">
                 <div class="card-body">
                     <div class="text-uppercase small text-muted fw-bold">Humedad Relativa Actual</div>
                     <div class="display-5 fw-bold text-primary my-1">
                         <span id="kpi-humedad">--</span> %
                     </div>
                     <div class="d-flex flex-wrap gap-1">
-                        <span class="badge bg-light text-dark border">
-                            Mín-Máx: @hMin% - @hMax%
+                        <span class="kpi-range-chip">
+                            Rango: @hMin.ToString("0.##")% — @hMax.ToString("0.##")%
                         </span>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle">
-                            Óptima: ≥ @hOptimaCalculada.ToString("0.0")%
+                        <span class="kpi-optimal-chip">
+                            Óptimo: ≥ @hOptima.ToString("0.##")% y &lt; @hMax.ToString("0.##")%
                         </span>
                     </div>
                 </div>
@@ -120,21 +123,22 @@
         </div>
 
         <div class="col-md-4">
-            <div class="card border-danger shadow-sm h-100">
+            <div class="card environment-kpi environment-kpi--temperature h-100">
                 <div class="card-body">
                     <div class="text-uppercase small text-muted fw-bold">Temperatura Ambiental</div>
                     <div class="display-5 fw-bold text-danger my-1">
                         <span id="kpi-temperatura">--</span> °C
                     </div>
-                    <span class="badge bg-light text-dark border">
-                        Rango óptimo: @Model?.Planta?.TemperaturaMinima°C - @Model?.Planta?.TemperaturaMaxima°C
-                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        <span class="kpi-range-chip">Rango: @tMin.ToString("0.##")°C — @tMax.ToString("0.##")°C</span>
+                        <span class="kpi-optimal-chip">Óptimo: ≥ @tOptima.ToString("0.##")°C y &lt; @tMax.ToString("0.##")°C</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="col-md-4">
-            <div class="card border-success shadow-sm h-100">
+            <div class="card environment-kpi environment-kpi--transmission h-100">
                 <div class="card-body">
                     <div class="text-uppercase small text-muted fw-bold">Última Transmisión ESP32</div>
                     <div class="h2 fw-bold text-dark my-2" id="kpi-hora">Sin datos</div>
@@ -179,8 +183,10 @@
                             string colorBadge = item.TipoEvento switch
                             {
                                 "RIEGO_EMERGENCIA" => "bg-danger",
-                                "RIEGO_REDUCIDO" => "bg-success",
-                                "RIEGO_PROGRAMADO" => "bg-primary",
+                                "RIEGO_EMERGENCIA_FINALIZADO" => "bg-success",
+                                "RIEGO_PROGRAMADO_PENDIENTE" => "bg-primary",
+                                "RIEGO_OMITIDO_RANGO_OPTIMO" => "bg-success",
+                                "RIEGO_OMITIDO_PROTECCION" => "bg-warning text-dark",
                                 "RIEGO_POSPUESTO" => "bg-warning text-dark",
                                 _ => "bg-secondary"
                             };

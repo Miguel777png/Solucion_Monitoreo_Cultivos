@@ -1,0 +1,55 @@
+@model Web_Solucion_Monitoreo_Invernadero.Models.Planta
+@using System.Globalization
+@{
+    string Numero(decimal valor) => valor.ToString("0.##", CultureInfo.InvariantCulture);
+    decimal temperaturaMedia = Math.Round((Model.TemperaturaMinima + Model.TemperaturaMaxima) / 2m, 2);
+    decimal humedadMedia = Math.Round((Model.HumedadMinima + Model.HumedadMaxima) / 2m, 2);
+    bool temperaturaPersonalizada = Math.Abs(Model.TemperaturaOptima - temperaturaMedia) >= 0.01m;
+    bool humedadPersonalizada = Math.Abs(Model.HumedadOptima - humedadMedia) >= 0.01m;
+}
+
+<div class="threshold-group">
+    <div class="threshold-group-heading">
+        <div><span class="threshold-icon threshold-icon--temperature">°C</span><strong>Temperatura</strong></div>
+        <small>Protección fuera del mínimo/máximo. Óptimo desde el valor configurado hasta antes del máximo.</small>
+    </div>
+    <div class="threshold-grid threshold-grid--range">
+        <label class="threshold-field"><span>Mínima permitida</span><input type="number" step="0.1" min="-10" max="60" name="temperaturaMinima" value="@Numero(Model.TemperaturaMinima)" class="form-control" required /></label>
+        <label class="threshold-field"><span>Máxima permitida</span><input type="number" step="0.1" min="-10" max="60" name="temperaturaMaxima" value="@Numero(Model.TemperaturaMaxima)" class="form-control" required /></label>
+    </div>
+    <label class="optional-optimum-toggle">
+        @if (temperaturaPersonalizada)
+        { <input type="checkbox" class="form-check-input" data-optimum-toggle checked /> }
+        else
+        { <input type="checkbox" class="form-check-input" data-optimum-toggle /> }
+        <span>Personalizar dónde comienza el rango óptimo</span>
+    </label>
+    <label class="threshold-field threshold-field--optimal optional-optimum-field @(temperaturaPersonalizada ? "" : "d-none")">
+        <span>Inicio del rango óptimo</span>
+        <input type="number" step="0.1" min="-10" max="60" name="temperaturaOptima" value="@Numero(Model.TemperaturaOptima)" class="form-control" />
+        <small>Si no lo personalizas, el punto medio entre mínimo y máximo se calculará al guardar.</small>
+    </label>
+</div>
+
+<div class="threshold-group mb-0">
+    <div class="threshold-group-heading">
+        <div><span class="threshold-icon threshold-icon--humidity">%</span><strong>Humedad relativa</strong></div>
+        <small>La válvula se abre bajo el mínimo y se cierra al recuperar el rango permitido.</small>
+    </div>
+    <div class="threshold-grid threshold-grid--range">
+        <label class="threshold-field"><span>Mínima permitida</span><input type="number" step="0.1" min="0" max="100" name="humedadMinima" value="@Numero(Model.HumedadMinima)" class="form-control" required /></label>
+        <label class="threshold-field"><span>Máxima permitida</span><input type="number" step="0.1" min="0" max="100" name="humedadMaxima" value="@Numero(Model.HumedadMaxima)" class="form-control" required /></label>
+    </div>
+    <label class="optional-optimum-toggle">
+        @if (humedadPersonalizada)
+        { <input type="checkbox" class="form-check-input" data-optimum-toggle checked /> }
+        else
+        { <input type="checkbox" class="form-check-input" data-optimum-toggle /> }
+        <span>Personalizar dónde comienza el rango óptimo</span>
+    </label>
+    <label class="threshold-field threshold-field--optimal optional-optimum-field @(humedadPersonalizada ? "" : "d-none")">
+        <span>Inicio del rango óptimo</span>
+        <input type="number" step="0.1" min="0" max="100" name="humedadOptima" value="@Numero(Model.HumedadOptima)" class="form-control" />
+        <small>Si no lo personalizas, el punto medio entre mínimo y máximo se calculará al guardar.</small>
+    </label>
+</div>
