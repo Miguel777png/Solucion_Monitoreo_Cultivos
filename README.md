@@ -271,8 +271,11 @@ const int MAX_RIEGO_DEMO_SEG = 10;
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 // VERIFICA Y REEMPLAZA EL DOMINIO EN AMBAS URLs POR EL DE TU PROPIO DEV TUNNEL:
-const char* serverUrl = "[https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria](https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria)";
-const char* confirmarComandoUrl = "[https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar](https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar)";
+// ServerURL DEBE APUNTAR con la ruta /api/telemetria
+// ServerURL DEBE APUNTAR con la ruta /api/telemetria/comandos/confirmar
+
+const char* serverUrl = "[https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria";
+const char* confirmarComandoUrl = "[https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar";
 const char* CODIGO_DISPOSITIVO = "ESP32-ORQ-01";
 
 DHT dht(DHT_PIN, DHT_TYPE);
@@ -632,6 +635,6 @@ void enviarTelemetria() {
 
 ## 7. Primer Acceso al Sistema Web
 
-1. Abre en tu navegador `http://localhost:5034` (o la URL pública de tu Dev Tunnel).
+1. Abre en tu navegador `http://localhost:5034` (o ejecuta en Visual Studio con el Dev Tunnel Activado accediendo con la URL pública de tu Dev Tunnel).
 2. El sistema redirigirá automáticamente a **`/Auth/Login`**.
 3. Inicia sesión con el **correo electrónico** y **contraseña** de un usuario activo registrado en la tabla `usuarios` de tu base de datos para ingresar al **Monitor en Vivo**.
