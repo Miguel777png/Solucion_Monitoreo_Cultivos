@@ -5,23 +5,30 @@ using Web_Solucion_Monitoreo_Invernadero.Models;
 namespace Web_Solucion_Monitoreo_Invernadero.Services
 {
 
-    /// Servicio en segundo plano (BackgroundService) que se ejecuta cada 20 segundos para gestionar
-    /// el ciclo de vida de las órdenes de riego y evaluar los horarios programados activos.
-    /// Marca como expiradas las órdenes no confirmadas a tiempo, valida la conexión del sensor y
-    /// los umbrales botánicos de la planta antes de emitir nuevas órdenes idempotentes, desactiva
-    /// agendas de fecha única ya procesadas y registra cada resultado en la bitácora del sistema.
-
+    /// <summary>
+    /// Revisa los horarios de riego y crea las órdenes necesarias.
+    /// </summary>
     public class RiegoProgramadoWorker : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly EstadoInvernaderoService _ram;
 
+        /// <summary>
+        /// Inicializa el proceso de riego programado.
+        /// </summary>
+        /// <param name="scopeFactory">Permite crear un alcance para usar la base de datos.</param>
+        /// <param name="ram">Servicio con los estados actuales.</param>
         public RiegoProgramadoWorker(IServiceScopeFactory scopeFactory, EstadoInvernaderoService ram)
         {
             _scopeFactory = scopeFactory;
             _ram = ram;
         }
 
+        /// <summary>
+        /// Ejecuta la revisión de los calendarios cada 20 segundos.
+        /// </summary>
+        /// <param name="stoppingToken">Token usado para detener el servicio.</param>
+        /// <returns>Una tarea que se mantiene activa mientras funciona la aplicación.</returns>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -39,6 +46,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             }
         }
 
+        /// <summary>
+        /// Evalúa los horarios activos y guarda el resultado de cada uno.
+        /// </summary>
+        /// <param name="ct">Token de cancelación.</param>
+        /// <returns>Una tarea que representa la evaluación.</returns>
         private async Task EvaluarCalendariosAsync(CancellationToken ct)
         {
             DateTime ahora = DateTime.Now;
@@ -201,6 +213,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Services
             }
         }
 
+        /// <summary>
+        /// Convierte un día de la semana a su nombre en español.
+        /// </summary>
+        /// <param name="dia">Día que se desea convertir.</param>
+        /// <returns>El nombre del día en español.</returns>
         private static string ObtenerDiaSemanaEnEspanol(DayOfWeek dia) => dia switch
         {
             DayOfWeek.Monday => "Lunes",

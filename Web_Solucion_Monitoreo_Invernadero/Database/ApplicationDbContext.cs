@@ -3,20 +3,40 @@ using Web_Solucion_Monitoreo_Invernadero.Models;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Database
 {
+    /// <summary>
+    /// Representa la conexión y las tablas usadas por Entity Framework.
+    /// </summary>
     public class ApplicationDbContext : DbContext
     {
+        /// <summary>
+        /// Inicializa el contexto con la configuración registrada en la aplicación.
+        /// </summary>
+        /// <param name="options">Opciones de conexión y proveedor de base de datos.</param>
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
+        /// <summary>Tabla de usuarios.</summary>
         public DbSet<Usuario> Usuarios { get; set; }
+        /// <summary>Tabla del catálogo de plantas.</summary>
         public DbSet<Planta> Plantas { get; set; }
+        /// <summary>Tabla de invernaderos.</summary>
         public DbSet<Invernadero> Invernaderos { get; set; }
+        /// <summary>Tabla de sensores ESP32.</summary>
         public DbSet<Sensor> Sensores { get; set; }
+        /// <summary>Tabla del historial ambiental.</summary>
         public DbSet<RegistroHistorico> RegistroHistorico { get; set; }
+        /// <summary>Tabla de riegos y alertas.</summary>
         public DbSet<BitacoraRiegoAlerta> BitacoraRiegoAlertas { get; set; }
+        /// <summary>Tabla de horarios de riego.</summary>
         public DbSet<CalendarioRiego> CalendarioRiego { get; set; }
+        /// <summary>Tabla de órdenes de riego.</summary>
         public DbSet<ComandoRiego> ComandosRiego { get; set; }
+        /// <summary>Tabla de auditoría.</summary>
         public DbSet<AuditoriaCambio> AuditoriaCambios { get; set; }
 
+        /// <summary>
+        /// Configura índices, relaciones y restricciones de las entidades.
+        /// </summary>
+        /// <param name="modelBuilder">Constructor del modelo de Entity Framework.</param>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
