@@ -4,6 +4,44 @@ Plataforma web desarrollada en **ASP.NET Core MVC (.NET 8)** conectada a nodos m
 
 ---
 
+## Funcionamiento General
+
+El proyecto utiliza una arquitectura **MVC**. Los ESP32 envían la humedad y temperatura a la API de telemetría, el servidor evalúa los rangos de la planta asignada y responde qué actuadores deben activarse.
+
+* La humedad bajo el mínimo activa el riego de emergencia hasta recuperar el rango permitido.
+* La temperatura sobre el máximo activa la ventilación.
+* La temperatura bajo el mínimo activa la calefacción.
+* El valor óptimo indica dónde comienza el rango óptimo. Si no se personaliza, se calcula con el punto medio entre el mínimo y el máximo.
+* El calendario omite el riego cuando la humedad ya se encuentra en el rango óptimo.
+* Los administradores pueden gestionar usuarios y sensores. Los operadores pueden utilizar las funciones normales de monitoreo y configuración permitidas.
+
+### Estructura Principal
+
+```text
+Web_Solucion_Monitoreo_Invernadero/
+├── Controllers/     Controladores MVC y API de telemetría
+├── Models/          Entidades de la base de datos y DTO
+├── Database/        Contexto y configuración de Entity Framework
+├── Services/        Estado en memoria, auditoría y riego programado
+├── Views/           Vistas Razor organizadas por función
+├── wwwroot/         CSS, JavaScript y librerías del frontend
+├── Firmware/        Código del ESP32 para Wokwi
+└── sqlscript/       Script de creación de la base de datos
+```
+
+### Archivos Importantes
+
+* [Solución de Visual Studio](Web_Solucion_Monitoreo_Invernadero.slnx)
+* [Proyecto ASP.NET Core](Web_Solucion_Monitoreo_Invernadero/Web_Solucion_Monitoreo_Invernadero.csproj)
+* [Configuración principal de la aplicación](Web_Solucion_Monitoreo_Invernadero/Program.cs)
+* [Configuración de conexión](Web_Solucion_Monitoreo_Invernadero/appsettings.json)
+* [Script completo de la base de datos](Web_Solucion_Monitoreo_Invernadero/sqlscript/monitoreo_orquideas.sql)
+* [Firmware del ESP32](Web_Solucion_Monitoreo_Invernadero/Firmware/ESP32_Invernadero_Wokwi/ESP32_Invernadero_Wokwi.ino)
+* [Circuito de Wokwi](Web_Solucion_Monitoreo_Invernadero/Firmware/ESP32_Invernadero_Wokwi/diagram.json)
+* [Librerías utilizadas por Wokwi](Web_Solucion_Monitoreo_Invernadero/Firmware/libraries.txt)
+
+---
+
 ## 1. Requisitos Previos
 
 Antes de iniciar la instalación en un equipo local, asegúrate de contar con:
@@ -21,15 +59,27 @@ Antes de iniciar la instalación en un equipo local, asegúrate de contar con:
 Puedes ejecutar estos comandos **directamente desde la Terminal integrada de Visual Studio** (en el menú superior **Ver** $\rightarrow$ **Terminal**, o con el atajo `Ctrl + '` / `Ctrl + Ñ`), o bien desde PowerShell, CMD o Git Bash:
 
 1. Clona el repositorio en tu equipo e ingresa a la carpeta del proyecto:
-   ```bash
-   git clone [https://github.com/Miguel777png/Web_Solucion_Monitoreo_Invernadero.git](https://github.com/Miguel777png/Web_Solucion_Monitoreo_Invernadero.git)
-   cd Web_Solucion_Monitoreo_Invernadero
+   ```powershell
+   git clone https://github.com/Miguel777png/Solucion_Monitoreo_Cultivos.git
+   cd Solucion_Monitoreo_Cultivos
    ```
 
-2. Restaura los paquetes NuGet necesarios (incluyendo `Pomelo.EntityFrameworkCore.MySql`) desde la misma terminal:
-   ```bash
-   dotnet restore
+2. Restaura los paquetes NuGet necesarios:
+   ```powershell
+   dotnet restore .\Web_Solucion_Monitoreo_Invernadero\Web_Solucion_Monitoreo_Invernadero.csproj
    ```
+
+3. Compila el proyecto para comprobar que la instalación sea correcta:
+   ```powershell
+   dotnet build .\Web_Solucion_Monitoreo_Invernadero\Web_Solucion_Monitoreo_Invernadero.csproj
+   ```
+
+4. Ejecuta la aplicación desde la raíz del repositorio:
+   ```powershell
+   dotnet run --project .\Web_Solucion_Monitoreo_Invernadero
+   ```
+
+Actualmente el repositorio no posee un proyecto de pruebas automatizadas. Cuando se agregue uno, se podrá ejecutar con `dotnet test`.
 
 ---
 
@@ -50,16 +100,9 @@ Puedes ejecutar el sistema conectándote a una **base de datos MySQL local** en 
    * **Contraseña:** *(vacía por defecto en Laragon, o la clave que definiste al instalar MySQL)*
 
 3. **Ejecuta el script de creación de base de datos:**
-   * Abre el archivo `.sql` del proyecto en tu gestor SQL.
-   * Asegúrate de ejecutar el bloque completo desde la creación de la base de datos hasta los `INSERT` iniciales:
-     ```sql
-     CREATE DATABASE IF NOT EXISTS monitoreo_orquideas
-       CHARACTER SET utf8mb4
-       COLLATE utf8mb4_unicode_ci;
-
-     USE monitoreo_orquideas;
-     -- (Continúa con la creación de las tablas y los registros iniciales)
-     ```
+   * Abre [`Web_Solucion_Monitoreo_Invernadero/sqlscript/monitoreo_orquideas.sql`](Web_Solucion_Monitoreo_Invernadero/sqlscript/monitoreo_orquideas.sql) en tu gestor SQL.
+   * Este script comienza con `DROP DATABASE IF EXISTS`. Por este motivo elimina la base anterior y debe utilizarse solamente en una instalación nueva o en una base local que se pueda volver a crear.
+   * No ejecutes el script completo sobre una base con información que necesites conservar.
    * Presiona **Ejecutar** (`F9` en HeidiSQL o el ícono del rayo en MySQL Workbench).
 
 4. **Verifica la estructura:**
@@ -71,9 +114,18 @@ Si utilizarás la instancia desplegada en Microsoft Azure (`orquideas-iot3.mysql
 
 ---
 
-## 4. Configuración de `appsettings.json` (Local vs. Nube)
+## 4. Configuración de [`appsettings.json`](Web_Solucion_Monitoreo_Invernadero/appsettings.json) (Local vs. Nube)
 
-Abre el archivo **`appsettings.json`** en la raíz del proyecto web y modifica la cadena **`DefaultConnection`** según el entorno que vayas a utilizar:
+La aplicación necesita una cadena llamada **`DefaultConnection`**. Los siguientes ejemplos muestran su formato para trabajar en local o en Azure.
+
+> **Importante:** no guardes contraseñas reales en Git. Para trabajar en tu equipo utiliza User Secrets o una variable de entorno. Si una contraseña fue publicada anteriormente, debe cambiarse en el servidor de base de datos.
+
+Puedes guardar la conexión de desarrollo mediante User Secrets:
+
+```powershell
+dotnet user-secrets init --project .\Web_Solucion_Monitoreo_Invernadero
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "TU_CADENA_DE_CONEXION" --project .\Web_Solucion_Monitoreo_Invernadero
+```
 
 ### Caso 1: Conectarse a tu Base de Datos Local (Laragon / MySQL Local)
 
@@ -116,11 +168,11 @@ Para Azure Database for MySQL debes apuntar al servidor en Azure, indicar el usu
 
 ### Resumen de qué cambia en `appsettings.json`
 
-| Parámetro | Configuración Local (Laragon/MySQL) | Configuración Nube (Azure MySQL) |
-| :--- | :--- | :--- |
-| **`Server`** | `localhost` (o `127.0.0.1`) | `orquideas-iot3.mysql.database.azure.com` |
-| **`Uid`** | `root` | `administrador` (usuario admin de Azure) |
-| **`Pwd`** | *(vacío)* o tu clave local | Contraseña configurada en el servidor Azure |
+| Parámetro     | Configuración Local (Laragon/MySQL)           | Configuración Nube (Azure MySQL)                  |
+| :------------ | :-------------------------------------------- | :------------------------------------------------ |
+| **`Server`**  | `localhost` (o `127.0.0.1`)                   | `orquideas-iot3.mysql.database.azure.com`         |
+| **`Uid`**     | `root`                                        | `administrador` (usuario admin de Azure)          |
+| **`Pwd`**     | *(vacío)* o tu clave local                    | Contraseña configurada en el servidor Azure       |
 | **`SslMode`** | `None` *(evita errores de certificado local)* | `Required` *(obligatorio por seguridad en Azure)* |
 
 ---
@@ -132,14 +184,16 @@ Los microcontroladores ESP32 simulados en **Wokwi** se ejecutan en internet y **
 
 ### Pasos para crear el túnel y levantar el servidor:
 
-1. Abre la solución **`Web_Solucion_Monitoreo_Invernadero.sln`** en **Visual Studio**.
+1. Abre la solución [`Web_Solucion_Monitoreo_Invernadero.slnx`](Web_Solucion_Monitoreo_Invernadero.slnx) en **Visual Studio**.
 2. En la barra superior, haz clic en la flecha desplegable junto al botón verde de ejecución (**`http`**).
 3. Selecciona **Túneles de desarrollo** $\rightarrow$ **Crear un túnel...**.
 4. Inicia sesión con tu cuenta Microsoft / institucional y configura los parámetros:
    * **Nombre:** `tunel-orquideas`
    * **Tipo de túnel:** **Persistente** *(para conservar la misma URL al reiniciar)*
    * **Acceso:** **Público** *(indispensable para que el ESP32 pueda enviar peticiones `POST` sin iniciar sesión)*
-5. Presiona **`F5`** (o clic en el botón **http**) para ejecutar el proyecto. Visual Studio abrirá el navegador y mostrará la URL pública generada (ejemplo: `https://lb0ldwqg-5034.brs.devtunnels.ms`). **Copia esta URL base**, ya que deberás colocarla en **dos variables** dentro del código del ESP32 en Wokwi.
+5. Presiona **`F5`** (o clic en el botón **http**) para ejecutar el proyecto. Visual Studio abrirá el navegador y mostrará la URL pública generada (ejemplo: `https://TU-TUNEL-5034.brs.devtunnels.ms`). **Copia esta URL base**, ya que deberás colocarla en **dos variables** dentro del código del ESP32 en Wokwi.
+
+El túnel debe ser público para que Wokwi pueda enviar telemetría. Utilízalo solamente durante las pruebas, ya que el endpoint del ESP32 acepta lecturas sin iniciar sesión.
 
 ---
 
@@ -152,12 +206,12 @@ Sigue estos pasos para montar el microcontrolador, el sensor DHT22, el servomoto
 2. En el menú principal, haz clic en **New Project** $\rightarrow$ selecciona la placa **ESP32**.
 
 ### Paso 2: Instalar las librerías necesarias (`libraries.txt`)
-1. En el editor de Wokwi, haz clic en la pestaña **`Library Manager`** (o abre el archivo **`libraries.txt`** en la barra superior de pestañas).
+1. En el editor de Wokwi, haz clic en la pestaña **`Library Manager`** y utiliza como referencia el archivo [`Firmware/libraries.txt`](Web_Solucion_Monitoreo_Invernadero/Firmware/libraries.txt).
 2. Agrega las siguientes librerías externas (las librerías `WiFi.h`, `HTTPClient.h`, `WiFiClientSecure.h` y `Preferences.h` ya vienen integradas en el núcleo del ESP32):
 
 ```text
 # Wokwi Library List
-# See [https://docs.wokwi.com/guides/libraries](https://docs.wokwi.com/guides/libraries)
+# See https://docs.wokwi.com/guides/libraries
 
 DHT sensor library
 ArduinoJson
@@ -168,462 +222,22 @@ ESP32Servo
 1. Haz clic en la pestaña **`diagram.json`** dentro del editor de Wokwi.
 2. Borra el contenido por defecto y pega la siguiente configuración (incluye la placa **ESP32**, el sensor **DHT22** en `GPIO 15`, el **Servomotor** de válvula en `GPIO 26`, el **LED Azul de ventilación** en `GPIO 27` y el **LED Rojo de calefacción** en `GPIO 14` con sus resistencias de $1\text{ k}\Omega$):
 
-```json
-{
-  "version": 1,
-  "author": "Anonymous maker",
-  "editor": "wokwi",
-  "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": -105.6, "left": -4.76, "attrs": {} },
-    {
-      "type": "wokwi-dht22",
-      "id": "dht1",
-      "top": -278.1,
-      "left": 23.4,
-      "attrs": { "humidity": "82.5", "temperature": "32.5" }
-    },
-    {
-      "type": "wokwi-servo",
-      "id": "servo1",
-      "top": 178.6,
-      "left": -37.4,
-      "rotate": 90,
-      "attrs": { "hornColor": "blue" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led1",
-      "top": -109.2,
-      "left": -111.4,
-      "attrs": { "color": "red" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led2",
-      "top": -109.2,
-      "left": -159.4,
-      "attrs": { "color": "blue" }
-    },
-    {
-      "type": "wokwi-resistor",
-      "id": "r1",
-      "top": -24,
-      "left": -163.75,
-      "rotate": 90,
-      "attrs": { "value": "1000" }
-    },
-    {
-      "type": "wokwi-resistor",
-      "id": "r2",
-      "top": -24,
-      "left": -115.75,
-      "rotate": 90,
-      "attrs": { "value": "1000" }
-    }
-  ],
-  "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "dht1:VCC", "esp:3V3", "red", [ "h-38.4", "v86.4" ] ],
-    [ "dht1:SDA", "esp:15", "green", [ "v28.8", "h67.3", "v201.6" ] ],
-    [ "dht1:GND", "esp:GND.2", "black", [ "h28.8" ] ],
-    [ "servo1:PWM", "esp:26", "green", [ "h-67.4", "v-172.8" ] ],
-    [ "servo1:V+", "esp:5V", "red", [ "v-28.8", "h-48.25" ] ],
-    [ "servo1:GND", "esp:GND.2", "black", [ "h76.8", "v-259.2" ] ],
-    [ "led2:A", "r1:1", "red", [ "v0" ] ],
-    [ "led1:A", "r2:1", "red", [ "v0" ] ],
-    [ "r1:2", "esp:27", "red", [ "v8.4", "h134.25" ] ],
-    [ "r2:2", "esp:14", "red", [ "v18", "h86.25" ] ],
-    [ "led1:C", "esp:GND.1", "black", [ "v0" ] ],
-    [ "led2:C", "esp:GND.1", "black", [ "v0" ] ]
-  ],
-  "dependencies": {}
-}
-```
+La configuración completa ya se encuentra en [`Firmware/ESP32_Invernadero_Wokwi/diagram.json`](Web_Solucion_Monitoreo_Invernadero/Firmware/ESP32_Invernadero_Wokwi/diagram.json). Copia el contenido de ese archivo y pégalo en la pestaña **`diagram.json`** de Wokwi.
 
 ### Paso 4: Pegar el código (`sketch.ino`) y configurar ambas URLs de tu Dev Tunnel
-1. Regresa a la pestaña **`sketch.ino`**, borra el código inicial y pega el siguiente firmware.
+1. Abre el archivo [`Firmware/ESP32_Invernadero_Wokwi/ESP32_Invernadero_Wokwi.ino`](Web_Solucion_Monitoreo_Invernadero/Firmware/ESP32_Invernadero_Wokwi/ESP32_Invernadero_Wokwi.ino), copia su contenido y pégalo en **`sketch.ino`** dentro de Wokwi. Este archivo es la versión principal del firmware y debe mantenerse actualizado.
 2. **Verificación obligatoria del Dev Tunnel en las dos URLs:** Debes reemplazar el dominio del túnel por el de **TU propio Dev Tunnel** generado en Visual Studio en **ambas constantes**:
    * `serverUrl`: debe quedar como `"https://TU-TUNEL-5034.brs.devtunnels.ms/api/telemetria"`
    * `confirmarComandoUrl`: debe quedar como `"https://TU-TUNEL-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar"`
    *(Si falta actualizar cualquiera de las dos, el ESP32 no podrá enviar telemetría o no podrá confirmar al servidor cuando complete un riego).*
 3. Si vas a simular más de un invernadero en paralelo, cambia también `CODIGO_DISPOSITIVO` (`"ESP32-ORQ-01"`, `"ESP32-ORQ-02"` o `"ESP32-ORQ-03"`).
 
+El código completo no se repite en este documento para evitar que existan dos versiones diferentes. Antes de iniciar Wokwi, modifica solamente estas variables en el archivo del firmware:
+
 ```cpp
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
-#include <ArduinoJson.h>
-#include <ESP32Servo.h>
-#include <Preferences.h>
-#include "DHT.h"
-
-#define DHT_PIN 15
-#define DHT_TYPE DHT22
-#define SERVO_PIN 26
-#define LED_VENTILACION_PIN 27
-#define LED_CALEFACCION_PIN 14
-
-const int VALVULA_CERRADA = 0;
-const int VALVULA_ABIERTA = 90;
-const int MAX_RIEGO_DEMO_SEG = 10;
-
-const char* ssid = "Wokwi-GUEST";
-const char* password = "";
-// VERIFICA Y REEMPLAZA EL DOMINIO EN AMBAS URLs POR EL DE TU PROPIO DEV TUNNEL:
-// ServerURL DEBE APUNTAR con la ruta /api/telemetria
-// ServerURL DEBE APUNTAR con la ruta /api/telemetria/comandos/confirmar
-
-const char* serverUrl = "https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria";
-const char* confirmarComandoUrl = "https://lb0ldwqg-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar";
+const char* serverUrl = "https://TU-TUNEL-5034.brs.devtunnels.ms/api/telemetria";
+const char* confirmarComandoUrl = "https://TU-TUNEL-5034.brs.devtunnels.ms/api/telemetria/comandos/confirmar";
 const char* CODIGO_DISPOSITIVO = "ESP32-ORQ-01";
-
-DHT dht(DHT_PIN, DHT_TYPE);
-Servo servoValvula;
-Preferences preferencias;
-
-unsigned long ultimoEnvio = 0;
-const unsigned long INTERVALO_ENVIO_MS = 2500;
-const unsigned long TIMEOUT_COMANDO_CLIMA_MS = 10000;
-const unsigned long TIMEOUT_RIEGO_EMERGENCIA_MS = 10000;
-
-bool regaderaActiva = false;
-bool riegoEmergenciaContinuo = false;
-bool ventilacionActiva = false;
-bool calefaccionActiva = false;
-unsigned long tiempoFinRegadera = 0;
-unsigned long ultimoTickVisual = 0;
-unsigned long ultimoComandoClima = 0;
-unsigned long ultimoComandoRiegoEmergencia = 0;
-unsigned long ultimoIntentoConfirmacion = 0;
-
-int idComandoActual = 0;
-int idUltimoComandoCompletado = 0;
-int idConfirmacionPendiente = 0;
-String estadoConfirmacionPendiente = "";
-
-void setup() {
-  Serial.begin(115200);
-
-  pinMode(LED_VENTILACION_PIN, OUTPUT);
-  pinMode(LED_CALEFACCION_PIN, OUTPUT);
-  digitalWrite(LED_VENTILACION_PIN, LOW);
-  digitalWrite(LED_CALEFACCION_PIN, LOW);
-
-  servoValvula.setPeriodHertz(50);
-  servoValvula.attach(SERVO_PIN, 500, 2400);
-  servoValvula.write(VALVULA_CERRADA);
-
-  dht.begin();
-  preferencias.begin("riego", false);
-  idUltimoComandoCompletado = preferencias.getInt("ultimoOk", 0);
-  int idComandoInterrumpido = preferencias.getInt("enCurso", 0);
-
-  WiFi.begin(ssid, password, 6);
-  Serial.print("Conectando WiFi");
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(300);
-    Serial.print(".");
-  }
-
-  Serial.printf("\n[%s] WiFi conectado.\n", CODIGO_DISPOSITIVO);
-
-  if (idComandoInterrumpido > 0) {
-    preferencias.remove("enCurso");
-    programarConfirmacion(idComandoInterrumpido, "Fallido");
-  }
-
-  if (String(CODIGO_DISPOSITIVO).endsWith("02")) delay(800);
-  if (String(CODIGO_DISPOSITIVO).endsWith("03")) delay(1600);
-}
-
-void loop() {
-  unsigned long ahora = millis();
-
-  if (riegoEmergenciaContinuo &&
-      ahora - ultimoComandoRiegoEmergencia >= TIMEOUT_RIEGO_EMERGENCIA_MS) {
-    riegoEmergenciaContinuo = false;
-    regaderaActiva = false;
-    servoValvula.write(VALVULA_CERRADA);
-    Serial.println("VALVULA CERRADA: se perdio la confirmacion del servidor.");
-  }
-
-  actualizarRegadera(ahora);
-
-  if (idConfirmacionPendiente > 0 &&
-      ahora - ultimoIntentoConfirmacion >= 3000) {
-    intentarConfirmacionPendiente();
-  }
-
-  if (ultimoComandoClima != 0 &&
-      ahora - ultimoComandoClima >= TIMEOUT_COMANDO_CLIMA_MS) {
-    actualizarClimatizacion(false, false);
-    ultimoComandoClima = 0;
-    Serial.println("Climatizacion apagada: sin respuesta reciente del servidor.");
-  }
-
-  if (ahora - ultimoEnvio >= INTERVALO_ENVIO_MS) {
-    ultimoEnvio = ahora;
-    enviarTelemetria();
-  }
-}
-
-void actualizarClimatizacion(bool activarVentilacion, bool activarCalefaccion) {
-  // Estado imposible: apaga ambos actuadores en vez de ejecutar una orden
-  // contradictoria.
-  if (activarVentilacion && activarCalefaccion) {
-    activarVentilacion = false;
-    activarCalefaccion = false;
-    Serial.println("Respuesta invalida: ventilacion y calefaccion simultaneas.");
-  }
-
-  if (activarVentilacion != ventilacionActiva) {
-    ventilacionActiva = activarVentilacion;
-    digitalWrite(LED_VENTILACION_PIN, ventilacionActiva ? HIGH : LOW);
-    Serial.printf("VENTILACION: %s\n", ventilacionActiva ? "ACTIVADA" : "DESACTIVADA");
-  }
-
-  if (activarCalefaccion != calefaccionActiva) {
-    calefaccionActiva = activarCalefaccion;
-    digitalWrite(LED_CALEFACCION_PIN, calefaccionActiva ? HIGH : LOW);
-    Serial.printf("CALEFACCION: %s\n", calefaccionActiva ? "ACTIVADA" : "DESACTIVADA");
-  }
-}
-
-void programarConfirmacion(int idComando, const String& estado) {
-  if (idComando <= 0) {
-    return;
-  }
-
-  idConfirmacionPendiente = idComando;
-  estadoConfirmacionPendiente = estado;
-  intentarConfirmacionPendiente();
-}
-
-void intentarConfirmacionPendiente() {
-  if (idConfirmacionPendiente <= 0 || WiFi.status() != WL_CONNECTED) {
-    return;
-  }
-
-  ultimoIntentoConfirmacion = millis();
-
-  WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(5000);
-
-  HTTPClient http;
-  http.begin(client, confirmarComandoUrl);
-  http.addHeader("Content-Type", "application/json");
-
-  JsonDocument documento;
-  documento["codigoDispositivo"] = CODIGO_DISPOSITIVO;
-  documento["idComandoRiego"] = idConfirmacionPendiente;
-  documento["estado"] = estadoConfirmacionPendiente;
-
-  String payload;
-  serializeJson(documento, payload);
-
-  int httpCode = http.POST(payload);
-
-  if (httpCode == HTTP_CODE_OK) {
-    Serial.printf(
-      "Orden #%d confirmada como %s.\n",
-      idConfirmacionPendiente,
-      estadoConfirmacionPendiente.c_str()
-    );
-    idConfirmacionPendiente = 0;
-    estadoConfirmacionPendiente = "";
-  } else {
-    Serial.printf(
-      "No se pudo confirmar la orden. HTTP %d; se reintentara.\n",
-      httpCode
-    );
-  }
-
-  http.end();
-}
-
-void activarRegadera(int tiempoOrdenSeg, int idComando) {
-  if (regaderaActiva || tiempoOrdenSeg <= 0) {
-    return;
-  }
-
-  int tiempoDemoSeg = min(tiempoOrdenSeg, MAX_RIEGO_DEMO_SEG);
-
-  regaderaActiva = true;
-  idComandoActual = idComando;
-  ultimoTickVisual = millis();
-  tiempoFinRegadera = millis() + (tiempoDemoSeg * 1000UL);
-  servoValvula.write(VALVULA_ABIERTA);
-
-  if (idComandoActual > 0) {
-    preferencias.putInt("enCurso", idComandoActual);
-    programarConfirmacion(idComandoActual, "Confirmado");
-  }
-
-  Serial.printf(
-    "VALVULA ABIERTA A 90 GRADOS. Orden: %ds | Demo: %ds\n",
-    tiempoOrdenSeg,
-    tiempoDemoSeg
-  );
-}
-
-void actualizarRiegoEmergencia(bool activar) {
-  if (activar) {
-    ultimoComandoRiegoEmergencia = millis();
-
-    if (!riegoEmergenciaContinuo) {
-      if (idComandoActual > 0) {
-        preferencias.remove("enCurso");
-        programarConfirmacion(idComandoActual, "Fallido");
-      }
-      riegoEmergenciaContinuo = true;
-      regaderaActiva = true;
-      idComandoActual = 0;
-      servoValvula.write(VALVULA_ABIERTA);
-      Serial.println("VALVULA ABIERTA: humedad bajo el minimo permitido.");
-    }
-    return;
-  }
-
-  if (riegoEmergenciaContinuo) {
-    riegoEmergenciaContinuo = false;
-    regaderaActiva = false;
-    servoValvula.write(VALVULA_CERRADA);
-    Serial.println("VALVULA CERRADA: humedad recupero el rango permitido.");
-  }
-}
-
-void actualizarRegadera(unsigned long ahora) {
-  if (!regaderaActiva || riegoEmergenciaContinuo) {
-    return;
-  }
-
-  if (static_cast<long>(ahora - tiempoFinRegadera) >= 0) {
-    regaderaActiva = false;
-    servoValvula.write(VALVULA_CERRADA);
-    Serial.println("VALVULA CERRADA. RIEGO FINALIZADO.");
-
-    if (idComandoActual > 0) {
-      idUltimoComandoCompletado = idComandoActual;
-      preferencias.putInt("ultimoOk", idUltimoComandoCompletado);
-      preferencias.remove("enCurso");
-      programarConfirmacion(idComandoActual, "Completado");
-      idComandoActual = 0;
-    }
-
-    return;
-  }
-
-  if (ahora - ultimoTickVisual >= 1000) {
-    ultimoTickVisual = ahora;
-    unsigned long restantes = (tiempoFinRegadera - ahora + 999UL) / 1000UL;
-    Serial.printf("REGANDO... %lu segundos restantes\n", restantes);
-  }
-}
-
-void enviarTelemetria() {
-  float humedad = dht.readHumidity();
-  float temperatura = dht.readTemperature();
-
-  if (isnan(humedad) || isnan(temperatura)) {
-    Serial.println("Error leyendo el DHT22.");
-    return;
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    WiFi.reconnect();
-    return;
-  }
-
-  WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(5000);
-
-  HTTPClient http;
-  http.setReuse(false);
-  http.begin(client, serverUrl);
-  http.addHeader("Content-Type", "application/json");
-
-  JsonDocument documento;
-  documento["codigoDispositivo"] = CODIGO_DISPOSITIVO;
-  documento["humedad"] = round(humedad * 100.0) / 100.0;
-  documento["temperatura"] = round(temperatura * 100.0) / 100.0;
-
-  String payload;
-  serializeJson(documento, payload);
-
-  int httpCode = http.POST(payload);
-
-  if (httpCode <= 0) {
-    http.end();
-    delay(350);
-    http.begin(client, serverUrl);
-    http.addHeader("Content-Type", "application/json");
-    httpCode = http.POST(payload);
-  }
-
-  if (httpCode == HTTP_CODE_OK) {
-    String respuesta = http.getString();
-    JsonDocument respuestaJson;
-    DeserializationError error = deserializeJson(respuestaJson, respuesta);
-
-    if (error) {
-      Serial.printf("Respuesta JSON invalida: %s\n", error.c_str());
-    } else {
-      bool activarRiego = respuestaJson["activarRegadera"] | false;
-      int tiempoSeg = respuestaJson["tiempoSeg"] | 0;
-      bool riegoEmergencia = respuestaJson["riegoEmergenciaContinuo"] | false;
-      bool activarVentilacion = respuestaJson["activarVentilacion"] | false;
-      bool activarCalefaccion = respuestaJson["activarCalefaccion"] | false;
-      float temperaturaMinima = respuestaJson["temperaturaMinima"] | 0.0;
-      float temperaturaMaxima = respuestaJson["temperaturaMaxima"] | 0.0;
-      int idComandoRiego = respuestaJson["idComandoRiego"] | 0;
-
-      // Los LED obedecen al servidor. Un false apaga el actuador cuando la
-      // temperatura vuelve al rango configurado para la planta.
-      actualizarClimatizacion(activarVentilacion, activarCalefaccion);
-      ultimoComandoClima = millis();
-      actualizarRiegoEmergencia(riegoEmergencia);
-
-      if (!riegoEmergencia && activarRiego && tiempoSeg > 0) {
-        if (idComandoRiego > 0 && idComandoRiego == idUltimoComandoCompletado) {
-          // La respuesta anterior pudo perderse. No vuelve a abrir la válvula;
-          // solamente reitera la confirmación final.
-          programarConfirmacion(idComandoRiego, "Completado");
-        } else if (idComandoRiego > 0 && idComandoRiego == idComandoActual) {
-          programarConfirmacion(idComandoRiego, "Confirmado");
-        } else if (!regaderaActiva) {
-          activarRegadera(tiempoSeg, idComandoRiego);
-        } else {
-          Serial.printf(
-            "Orden #%d esperando: la valvula ya esta ocupada.\n",
-            idComandoRiego
-          );
-        }
-      }
-
-      Serial.printf(
-        "[%s] H: %.1f%% | T: %.1f C | Rango T: %.1f-%.1f C\n",
-        CODIGO_DISPOSITIVO,
-        humedad,
-        temperatura,
-        temperaturaMinima,
-        temperaturaMaxima
-      );
-    }
-  } else {
-    Serial.printf(
-      "[%s] Error HTTP %d: %s\n",
-      CODIGO_DISPOSITIVO,
-      httpCode,
-      http.errorToString(httpCode).c_str()
-    );
-  }
-
-  http.end();
-}
 ```
 
 ### Paso 5: Iniciar la simulación

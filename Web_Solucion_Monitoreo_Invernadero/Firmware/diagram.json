@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": -105.6,
+      "left": -4.76,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -278.1,
+      "left": 23.4,
+      "attrs": {
+        "humidity": "82.5",
+        "temperature": "21.3"
+      }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo1",
+      "top": -69.2,
+      "left": 172.8,
+      "attrs": { "hornColor": "blue" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": -109.2,
+      "left": -111.4,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led2",
+      "top": -109.2,
+      "left": -159.4,
+      "attrs": { "color": "blue" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": -24,
+      "left": -163.75,
+      "rotate": 90,
+      "attrs": { "value": "1000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": -24,
+      "left": -115.75,
+      "rotate": 90,
+      "attrs": { "value": "1000" }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "dht1:VCC",
+      "esp:3V3",
+      "red",
+      [ "h-38.4", "v86.4" ]
+    ],
+    [
+      "dht1:SDA",
+      "esp:15",
+      "blue",
+      [ "v19.2", "h67.3", "v211.2" ]
+    ],
+    [
+      "dht1:GND",
+      "esp:GND.2",
+      "black",
+      [ "h28.8" ]
+    ],
+    [
+      "servo1:PWM",
+      "esp:26",
+      "blue",
+      [ "h-28.8", "v125", "h-201.6", "v-115.2" ]
+    ],
+    [
+      "servo1:V+",
+      "esp:5V",
+      "red",
+      [ "h-28.8", "v-115.1", "h-172.8", "v220.8" ]
+    ],
+    [
+      "led2:A",
+      "r1:1",
+      "red",
+      [ "v0" ]
+    ],
+    [
+      "led1:A",
+      "r2:1",
+      "red",
+      [ "v0" ]
+    ],
+    [
+      "r1:2",
+      "esp:27",
+      "red",
+      [ "v8.4", "h134.25" ]
+    ],
+    [
+      "r2:2",
+      "esp:14",
+      "red",
+      [ "v18", "h86.25" ]
+    ],
+    [
+      "led1:C",
+      "esp:GND.1",
+      "black",
+      [ "v0" ]
+    ],
+    [
+      "led2:C",
+      "esp:GND.1",
+      "black",
+      [ "v0" ]
+    ],
+    [
+      "servo1:GND",
+      "esp:GND.3",
+      "black",
+      [ "h0" ]
+    ]
+  ],
+  "dependencies": {}
+}
