@@ -7,23 +7,31 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
-    /// Controlador para la administración de horarios de riego programado por invernadero.
-    /// Permite listar agendas activas con filtro por sector, programar riegos recurrentes por día
-    /// de la semana o en fechas específicas con duración definida, y desactivar horarios existentes,
-    /// registrando cada operación en la bitácora de auditoría.
-
+    /// <summary>
+    /// Administra los horarios de riego de cada invernadero.
+    /// </summary>
     [VerificarAcceso]
     public class CalendarioController : Controller
     {
         private readonly ApplicationDbContext _db;
         private readonly AuditoriaService _auditoria;
 
+        /// <summary>
+        /// Inicializa el controlador de calendarios.
+        /// </summary>
+        /// <param name="db">Contexto de la base de datos.</param>
+        /// <param name="auditoria">Servicio que registra los cambios.</param>
         public CalendarioController(ApplicationDbContext db, AuditoriaService auditoria)
         {
             _db = db;
             _auditoria = auditoria;
         }
 
+        /// <summary>
+        /// Lista los horarios activos y permite filtrarlos por invernadero.
+        /// </summary>
+        /// <param name="idInvernaderoFiltro">Invernadero seleccionado para el filtro.</param>
+        /// <returns>La vista con los horarios encontrados.</returns>
         public async Task<IActionResult> Index(int? idInvernaderoFiltro)
         {
             ViewBag.Invernaderos = await _db.Invernaderos
@@ -53,6 +61,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(horarios);
         }
 
+        /// <summary>
+        /// Crea un nuevo horario de riego.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que recibirá el horario.</param>
+        /// <param name="diaSemana">Día para un riego semanal.</param>
+        /// <param name="fechaEspecifica">Fecha para un riego de una sola vez.</param>
+        /// <param name="horaRiego">Hora en que se debe regar.</param>
+        /// <param name="tiempoRiegoSeg">Duración del riego en segundos.</param>
+        /// <returns>Una redirección al listado de calendarios.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear(
@@ -104,6 +121,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Desactiva un horario de riego existente.
+        /// </summary>
+        /// <param name="idCalendarioRiego">Identificador del horario.</param>
+        /// <returns>Una redirección al listado de calendarios.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Eliminar(int idCalendarioRiego)

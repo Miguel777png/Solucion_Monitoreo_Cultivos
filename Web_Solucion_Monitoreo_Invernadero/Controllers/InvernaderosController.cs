@@ -8,24 +8,31 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
 
-    /// Controlador maestro-detalle para la gestión de invernaderos y su configuración operativa.
-    /// Permite a operadores y administradores asignar especies disponibles (regla 1:1) y ajustar
-    /// la frecuencia de guardado histórico con trazabilidad Antes/Después. Además, restringe a los
-    /// administradores la creación de nuevos sectores y la vinculación de sensores de la lista blanca.
-
+    /// <summary>
+    /// Administra los invernaderos, sus plantas y sensores asignados.
+    /// </summary>
     [VerificarAcceso]
     public class InvernaderosController : Controller
     {
         private readonly ApplicationDbContext _db;
         private readonly AuditoriaService _auditoria;
 
+        /// <summary>
+        /// Inicializa el controlador de invernaderos.
+        /// </summary>
+        /// <param name="db">Contexto de la base de datos.</param>
+        /// <param name="auditoria">Servicio que registra los cambios.</param>
         public InvernaderosController(ApplicationDbContext db, AuditoriaService auditoria)
         {
             _db = db;
             _auditoria = auditoria;
         }
 
-        // VISTA MAESTRO-DETALLE (TABLA + FICHA SELECCIONADA)
+        /// <summary>
+        /// Muestra los invernaderos y el detalle del seleccionado.
+        /// </summary>
+        /// <param name="idSeleccionado">Identificador del invernadero seleccionado.</param>
+        /// <returns>La vista principal de invernaderos.</returns>
         public async Task<IActionResult> Index(int? idSeleccionado)
         {
             var invernaderos = await _db.Invernaderos
@@ -62,7 +69,13 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(invernaderos);
         }
 
-        // JARDINERO Y ADMINISTRADOR: Actualizar especie (1:1) y frecuencia histórica con ANTES -> DESPUÉS
+        /// <summary>
+        /// Actualiza la planta y la frecuencia de registro de un invernadero.
+        /// </summary>
+        /// <param name="idInvernadero">Identificador del invernadero.</param>
+        /// <param name="idNuevaPlanta">Nueva planta que se desea asignar.</param>
+        /// <param name="frecuenciaRegistroMin">Frecuencia de guardado en minutos.</param>
+        /// <returns>Una redirección al invernadero actualizado.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ActualizarConfiguracionOperativa(
@@ -127,7 +140,14 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index), new { idSeleccionado = idInvernadero });
         }
 
-        // EXCLUSIVO ADMINISTRADOR: Crear nuevo Invernadero
+        /// <summary>
+        /// Crea un nuevo invernadero. Esta acción es solo para administradores.
+        /// </summary>
+        /// <param name="nombre">Nombre del nuevo invernadero.</param>
+        /// <param name="ubicacion">Ubicación o sector.</param>
+        /// <param name="idPlanta">Planta que se asignará inicialmente.</param>
+        /// <param name="frecuenciaRegistroMin">Frecuencia de guardado en minutos.</param>
+        /// <returns>Una redirección al nuevo invernadero.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         [VerificarAcceso(SoloAdministrador = true)]
@@ -173,7 +193,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index), new { idSeleccionado = nuevoInv.IdInvernadero });
         }
 
-        // EXCLUSIVO ADMINISTRADOR: Vincular sensor disponible de la lista blanca al invernadero seleccionado
+        /// <summary>
+        /// Asigna un sensor disponible a un invernadero.
+        /// </summary>
+        /// <param name="idInvernadero">Identificador del invernadero.</param>
+        /// <param name="idSensor">Identificador del sensor disponible.</param>
+        /// <returns>Una redirección al invernadero actualizado.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         [VerificarAcceso(SoloAdministrador = true)]

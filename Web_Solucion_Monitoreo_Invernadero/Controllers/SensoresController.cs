@@ -8,9 +8,8 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
 
-    /// Controlador exclusivo para administradores que gestiona la lista blanca de nodos IoT (ESP32).
-    /// Permite registrar códigos de hardware únicos, vincular o desvincular dispositivos garantizando
-    /// la relación 1:1 con cada invernadero, y activar o desactivar nodos con registro en auditoría.
+    /// <summary>
+    /// Administra los sensores ESP32 permitidos en el sistema.
     /// </summary>
 
     [VerificarAcceso(SoloAdministrador = true)]
@@ -19,12 +18,23 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         private readonly ApplicationDbContext _db;
         private readonly AuditoriaService _auditoria;
 
+        /// <summary>
+        /// Inicializa el controlador de sensores.
+        /// </summary>
+        /// <param name="db">Contexto de la base de datos.</param>
+        /// <param name="auditoria">Servicio que registra los cambios.</param>
         public SensoresController(ApplicationDbContext db, AuditoriaService auditoria)
         {
             _db = db;
             _auditoria = auditoria;
         }
 
+        /// <summary>
+        /// Lista los sensores y aplica los filtros enviados.
+        /// </summary>
+        /// <param name="busqueda">Código o nombre usado para buscar.</param>
+        /// <param name="estadoFiltro">Estado que se desea mostrar.</param>
+        /// <returns>La vista con los sensores encontrados.</returns>
         public async Task<IActionResult> Index(string? busqueda, string? estadoFiltro)
         {
             ViewBag.Busqueda = busqueda;
@@ -69,7 +79,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(sensores);
         }
 
-        // VALIDACIÓN CENTRALIZADA 1:1: Verifica si un invernadero ya tiene un ESP32 asignado
+        /// <summary>
+        /// Busca el sensor que ya ocupa un invernadero.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea revisar.</param>
+        /// <param name="excluirIdSensor">Sensor que no se debe considerar.</param>
+        /// <returns>El sensor encontrado o <see langword="null"/>.</returns>
         private async Task<Sensor?> ObtenerSensorOcupandoInvernaderoAsync(int idInvernadero, int? excluirIdSensor = null)
         {
             var consulta = _db.Sensores.Where(s => s.IdInvernadero == idInvernadero);
@@ -82,7 +97,13 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return await consulta.FirstOrDefaultAsync();
         }
 
-        // REGISTRAR CÓDIGO HARDWARE EN LISTA BLANCA
+        /// <summary>
+        /// Registra un nuevo código de ESP32 en la lista permitida.
+        /// </summary>
+        /// <param name="codigoDispositivo">Código único del dispositivo.</param>
+        /// <param name="nombreNodo">Nombre opcional del nodo.</param>
+        /// <param name="idInvernadero">Invernadero que se asignará inicialmente.</param>
+        /// <returns>Una redirección al listado de sensores.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Registrar(
@@ -146,7 +167,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // ASIGNAR O DESVINCULAR UN SENSOR DE UN INVERNADERO
+        /// <summary>
+        /// Asigna o libera un sensor de un invernadero.
+        /// </summary>
+        /// <param name="idSensor">Identificador del sensor.</param>
+        /// <param name="idInvernadero">Nuevo invernadero o <see langword="null"/> para liberarlo.</param>
+        /// <returns>Una redirección al listado de sensores.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CambiarAsignacion(int idSensor, int? idInvernadero)
@@ -192,7 +218,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // ACTIVAR / DESACTIVAR EN LISTA BLANCA
+        /// <summary>
+        /// Activa o desactiva un sensor de la lista permitida.
+        /// </summary>
+        /// <param name="idSensor">Identificador del sensor.</param>
+        /// <returns>Una redirección al listado de sensores.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AlternarEstado(int idSensor)

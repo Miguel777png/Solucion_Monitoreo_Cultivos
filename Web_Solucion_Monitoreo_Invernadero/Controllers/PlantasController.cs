@@ -10,24 +10,32 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
 
 
-    /// Controlador CRUD para el catálogo botánico de especies de orquídeas.
-    /// Gestiona el alta, edición y borrado lógico de plantas con búsqueda y filtros de disponibilidad,
-    /// validando y normalizando los umbrales mínimos, óptimos y máximos de temperatura y humedad,
-    /// e impidiendo eliminar especies que estén asignadas a un invernadero activo.
-
+    /// <summary>
+    /// Administra las plantas y sus rangos de temperatura y humedad.
+    /// </summary>
     [VerificarAcceso]
     public class PlantasController : Controller
     {
         private readonly ApplicationDbContext _db;
         private readonly AuditoriaService _auditoria;
 
+        /// <summary>
+        /// Inicializa el controlador de plantas.
+        /// </summary>
+        /// <param name="db">Contexto de la base de datos.</param>
+        /// <param name="auditoria">Servicio que registra los cambios.</param>
         public PlantasController(ApplicationDbContext db, AuditoriaService auditoria)
         {
             _db = db;
             _auditoria = auditoria;
         }
 
-        // LISTADO DEL CATÁLOGO CON BÚSQUEDA Y FILTRO DE DISPONIBILIDAD
+        /// <summary>
+        /// Lista las plantas y aplica los filtros enviados.
+        /// </summary>
+        /// <param name="busqueda">Texto usado para buscar una planta.</param>
+        /// <param name="estadoFiltro">Estado de asignación que se desea mostrar.</param>
+        /// <returns>La vista con las plantas encontradas.</returns>
         public async Task<IActionResult> Index(string? busqueda, string? estadoFiltro)
         {
             ViewBag.Busqueda = busqueda;
@@ -62,7 +70,18 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(plantas);
         }
 
-        // CREAR NUEVA PLANTA EN EL CATÁLOGO
+        /// <summary>
+        /// Crea una planta con sus rangos ambientales.
+        /// </summary>
+        /// <param name="nombre">Nombre de la planta.</param>
+        /// <param name="descripcion">Descripción opcional.</param>
+        /// <param name="temperaturaMinima">Temperatura mínima permitida.</param>
+        /// <param name="temperaturaOptima">Inicio opcional del rango óptimo.</param>
+        /// <param name="temperaturaMaxima">Temperatura máxima permitida.</param>
+        /// <param name="humedadMinima">Humedad mínima permitida.</param>
+        /// <param name="humedadOptima">Inicio opcional del rango óptimo.</param>
+        /// <param name="humedadMaxima">Humedad máxima permitida.</param>
+        /// <returns>Una redirección al catálogo de plantas.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear(
@@ -123,7 +142,19 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         }
 
 
-        // EDITAR UMBRALES DE UNA PLANTA EXISTENTE (CON TRAZABILIDAD ANTES -> DESPUÉS)
+        /// <summary>
+        /// Edita los datos y rangos de una planta existente.
+        /// </summary>
+        /// <param name="idPlanta">Identificador de la planta.</param>
+        /// <param name="nombre">Nuevo nombre de la planta.</param>
+        /// <param name="descripcion">Nueva descripción opcional.</param>
+        /// <param name="temperaturaMinima">Temperatura mínima permitida.</param>
+        /// <param name="temperaturaOptima">Inicio opcional del rango óptimo.</param>
+        /// <param name="temperaturaMaxima">Temperatura máxima permitida.</param>
+        /// <param name="humedadMinima">Humedad mínima permitida.</param>
+        /// <param name="humedadOptima">Inicio opcional del rango óptimo.</param>
+        /// <param name="humedadMaxima">Humedad máxima permitida.</param>
+        /// <returns>Una redirección al catálogo de plantas.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Editar(
@@ -185,7 +216,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 
 
 
-        // ELIMINAR LÓGICAMENTE UNA PLANTA (SOLO SI NO ESTÁ ASIGNADA)
+        /// <summary>
+        /// Desactiva una planta si no está siendo utilizada.
+        /// </summary>
+        /// <param name="idPlanta">Identificador de la planta.</param>
+        /// <returns>Una redirección al catálogo de plantas.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Eliminar(int idPlanta)
@@ -215,7 +250,23 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // NORMALIZADOR DECIMAL SEGURO (SOPORTA COMA Y PUNTO SIN MULTIPLICAR POR 10/100)
+        /// <summary>
+        /// Convierte y valida los rangos ingresados en el formulario.
+        /// </summary>
+        /// <param name="sTMin">Temperatura mínima en texto.</param>
+        /// <param name="sTOpt">Inicio óptimo de temperatura en texto.</param>
+        /// <param name="sTMax">Temperatura máxima en texto.</param>
+        /// <param name="sHMin">Humedad mínima en texto.</param>
+        /// <param name="sHOpt">Inicio óptimo de humedad en texto.</param>
+        /// <param name="sHMax">Humedad máxima en texto.</param>
+        /// <param name="tMin">Temperatura mínima convertida.</param>
+        /// <param name="tOpt">Inicio óptimo de temperatura convertido.</param>
+        /// <param name="tMax">Temperatura máxima convertida.</param>
+        /// <param name="hMin">Humedad mínima convertida.</param>
+        /// <param name="hOpt">Inicio óptimo de humedad convertido.</param>
+        /// <param name="hMax">Humedad máxima convertida.</param>
+        /// <param name="error">Mensaje generado cuando los datos no son válidos.</param>
+        /// <returns><see langword="true"/> si todos los rangos son válidos.</returns>
         private static bool TryParsearUmbrales(
             string sTMin, string? sTOpt, string sTMax,
             string sHMin, string? sHOpt, string sHMax,

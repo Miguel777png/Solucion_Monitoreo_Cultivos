@@ -10,21 +10,26 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
 
 
-    /// 
-    /// Controlador encargado de la autenticación y gestión de sesiones de usuario.
-    /// Valida credenciales contra la base de datos, emite cookies de autenticación basadas en Claims
-    /// junto con variables de sesión HTTP, y gestiona el cierre de sesión y vistas de acceso denegado.
-    /// 
-
+    /// <summary>
+    /// Controla el inicio y cierre de sesión de los usuarios.
+    /// </summary>
     public class AuthController : Controller
     {
         private readonly ApplicationDbContext _db;
 
+        /// <summary>
+        /// Inicializa el controlador de autenticación.
+        /// </summary>
+        /// <param name="db">Contexto usado para consultar los usuarios.</param>
         public AuthController(ApplicationDbContext db)
         {
             _db = db;
         }
 
+        /// <summary>
+        /// Muestra el formulario de inicio de sesión.
+        /// </summary>
+        /// <returns>La vista de acceso o una redirección al monitoreo.</returns>
         [HttpGet]
         [AllowAnonymous]
         public IActionResult Login()
@@ -37,6 +42,12 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View();
         }
 
+        /// <summary>
+        /// Valida las credenciales y crea la sesión del usuario.
+        /// </summary>
+        /// <param name="correo">Correo ingresado por el usuario.</param>
+        /// <param name="password">Contraseña ingresada por el usuario.</param>
+        /// <returns>Una redirección al monitoreo o nuevamente al login.</returns>
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
@@ -94,6 +105,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction("Index", "Monitoreo");
         }
 
+        /// <summary>
+        /// Cierra la sesión y elimina la cookie de autenticación.
+        /// </summary>
+        /// <returns>Una redirección al inicio de sesión.</returns>
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -104,6 +119,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return RedirectToAction(nameof(Login));
         }
 
+        /// <summary>
+        /// Muestra la página cuando el usuario no tiene permiso.
+        /// </summary>
+        /// <returns>La vista de acceso denegado con estado 403.</returns>
         [HttpGet]
         [Authorize]
         public IActionResult AccesoDenegado()

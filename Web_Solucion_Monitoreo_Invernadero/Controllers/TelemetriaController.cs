@@ -8,12 +8,9 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
 
-    /// API REST central de comunicación entre los nodos ESP32 y el panel web en tiempo real.
-    /// Recibe lecturas periódicas de humedad y temperatura, actualiza la caché en memoria RAM,
-    /// evalúa actuaciones de climatización (ventilación/calefacción) y riego de emergencia continuo,
-    /// despacha y confirma de forma idempotente órdenes de riego persistentes, persiste históricos y
-    /// alertas en MySQL, y alimenta los endpoints de monitoreo y notificaciones en vivo del frontend.
-
+    /// <summary>
+    /// Recibe la telemetría del ESP32 y entrega las órdenes de los actuadores.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class TelemetriaController : ControllerBase
@@ -21,13 +18,22 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
         private readonly ApplicationDbContext _db;
         private readonly EstadoInvernaderoService _ram;
 
+        /// <summary>
+        /// Inicializa el controlador de telemetría.
+        /// </summary>
+        /// <param name="db">Contexto de la base de datos.</param>
+        /// <param name="ram">Servicio con el estado actual de los invernaderos.</param>
         public TelemetriaController(ApplicationDbContext db, EstadoInvernaderoService ram)
         {
             _db = db;
             _ram = ram;
         }
 
-        // 4. ENDPOINT DE ALERTAS EN VIVO PARA EL PANEL DERECHO Y TOASTS DEL DASHBOARD
+        /// <summary>
+        /// Obtiene las alertas más recientes de un invernadero.
+        /// </summary>
+        /// <param name="idInvernadero">Identificador del invernadero.</param>
+        /// <returns>Una respuesta JSON con las últimas alertas.</returns>
         [HttpGet("alertas/{idInvernadero:int}")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> ObtenerAlertasRecientes(int idInvernadero)
@@ -49,7 +55,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return Ok(alertas);
         }
 
-        // 1. ENDPOINT PARA LOS ESP32: POST /api/telemetria
+        /// <summary>
+        /// Procesa una lectura y responde qué actuadores deben funcionar.
+        /// </summary>
+        /// <param name="datos">Lectura enviada por el ESP32.</param>
+        /// <returns>Las órdenes de riego, ventilación y calefacción.</returns>
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> RecibirLectura([FromBody] LecturaSensorDto datos)
@@ -249,8 +259,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             });
         }
 
-        // El ESP32 confirma primero que comenzó la orden y luego que cerró la
-        // válvula. Las confirmaciones repetidas son idempotentes.
+        /// <summary>
+        /// Registra la confirmación enviada por el ESP32 para una orden de riego.
+        /// </summary>
+        /// <param name="confirmacion">Datos de la orden y su nuevo estado.</param>
+        /// <returns>El estado actualizado de la orden.</returns>
         [HttpPost("comandos/confirmar")]
         [AllowAnonymous]
         public async Task<IActionResult> ConfirmarComando(
@@ -362,7 +375,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             });
         }
 
-        // 2. ENDPOINT EN VIVO DE UN INVERNADERO ESPECÍFICO: GET /api/telemetria/actual/1
+        /// <summary>
+        /// Obtiene la lectura y el estado actual de un invernadero.
+        /// </summary>
+        /// <param name="idInvernadero">Identificador del invernadero.</param>
+        /// <returns>Una respuesta JSON con la lectura actual.</returns>
         [HttpGet("actual/{idInvernadero:int}")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> ObtenerEnVivo(int idInvernadero)
@@ -416,7 +433,10 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             });
         }
 
-        // 3. ENDPOINT GLOBAL DINÁMICO PARA N INVERNADEROS: GET /api/telemetria/resumen-todos
+        /// <summary>
+        /// Obtiene un resumen en vivo de todos los invernaderos activos.
+        /// </summary>
+        /// <returns>Una respuesta JSON con el estado de cada invernadero.</returns>
         [HttpGet("resumen-todos")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> ObtenerResumenTodos()

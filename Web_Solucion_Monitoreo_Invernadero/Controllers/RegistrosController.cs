@@ -9,22 +9,30 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
 
 
-    /// Controlador encargado de la consulta y exportación de trazabilidad histórica del sistema.
-    /// Provee vistas filtradas y endpoints JSON en vivo para el historial ambiental (con exportación
-    /// a CSV para Excel) y la bitácora de riegos y alertas, además de restringir exclusivamente a
-    /// los administradores la consulta del registro forense de auditoría de cambios por usuario.
-
+    /// <summary>
+    /// Consulta el historial, la bitácora y la auditoría del sistema.
+    /// </summary>
     [VerificarAcceso] // Protege TODAS las acciones de este controlador (exige sesión iniciada)
     public class RegistrosController : Controller
     {
         private readonly ApplicationDbContext _db;
 
+        /// <summary>
+        /// Inicializa el controlador de registros.
+        /// </summary>
+        /// <param name="db">Contexto de la base de datos.</param>
         public RegistrosController(ApplicationDbContext db)
         {
             _db = db;
         }
 
-        // 1. REGISTRO HISTÓRICO AMBIENTAL CON FILTROS (Acceso: Admin y Jardinero)
+        /// <summary>
+        /// Muestra el historial ambiental con filtros opcionales.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <returns>La vista con los registros encontrados.</returns>
         public async Task<IActionResult> Historial(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
         {
             ViewBag.Invernaderos = await _db.Invernaderos
@@ -41,7 +49,13 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(registros);
         }
 
-        // ENDPOINT JSON EN VIVO PARA LA TABLA DE HISTORIAL (Acceso: Admin y Jardinero)
+        /// <summary>
+        /// Entrega el historial ambiental en formato JSON.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <returns>Una respuesta JSON con los registros.</returns>
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> HistorialJson(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
@@ -60,6 +74,14 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return Json(resultado);
         }
 
+        /// <summary>
+        /// Realiza la consulta común del historial ambiental.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <param name="limite">Cantidad máxima de resultados.</param>
+        /// <returns>La lista de registros encontrados.</returns>
         private async Task<List<Models.RegistroHistorico>> ConsultarHistorialAsync(
             int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta, int limite)
         {
@@ -83,7 +105,13 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .ToListAsync();
         }
 
-        // EXPORTACIÓN DIRECTA A CSV (EXCEL) (Acceso: Admin y Jardinero)
+        /// <summary>
+        /// Exporta el historial ambiental a un archivo CSV.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <returns>El archivo CSV generado.</returns>
         public async Task<IActionResult> ExportarCsv(int? idInvernadero, DateTime? fechaDesde, DateTime? fechaHasta)
         {
             var datos = await ConsultarHistorialAsync(idInvernadero, fechaDesde, fechaHasta, 5000);
@@ -100,7 +128,14 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return File(bytes, "text/csv", $"Historial_Invernaderos_{DateTime.Now:yyyyMMdd_HHmm}.csv");
         }
 
-        // 2. BITÁCORA COMPLETA DE RIEGOS Y ALERTAS CON FILTROS COMBINADOS (Acceso: Admin y Jardinero)
+        /// <summary>
+        /// Muestra la bitácora de riegos y alertas.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="tipoEvento">Tipo de evento que se desea mostrar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <returns>La vista con los eventos encontrados.</returns>
         public async Task<IActionResult> Bitacora(
             int? idInvernadero, string? tipoEvento, DateTime? fechaDesde, DateTime? fechaHasta)
         {
@@ -118,7 +153,14 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return View(eventos);
         }
 
-        // ENDPOINT JSON EN VIVO PARA LA TABLA DE BITÁCORA (Acceso: Admin y Jardinero)
+        /// <summary>
+        /// Entrega la bitácora en formato JSON.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="tipoEvento">Tipo de evento que se desea mostrar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <returns>Una respuesta JSON con los eventos.</returns>
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> BitacoraJson(
@@ -139,6 +181,15 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
             return Json(resultado);
         }
 
+        /// <summary>
+        /// Realiza la consulta común de la bitácora.
+        /// </summary>
+        /// <param name="idInvernadero">Invernadero que se desea consultar.</param>
+        /// <param name="tipoEvento">Tipo de evento que se desea mostrar.</param>
+        /// <param name="fechaDesde">Fecha inicial del filtro.</param>
+        /// <param name="fechaHasta">Fecha final del filtro.</param>
+        /// <param name="limite">Cantidad máxima de resultados.</param>
+        /// <returns>La lista de eventos encontrados.</returns>
         private async Task<List<Models.BitacoraRiegoAlerta>> ConsultarBitacoraAsync(
             int? idInvernadero, string? tipoEvento, DateTime? fechaDesde, DateTime? fechaHasta, int limite)
         {
@@ -164,7 +215,11 @@ namespace Web_Solucion_Monitoreo_Invernadero.Controllers
                 .ToListAsync();
         }
 
-        // 3. AUDITORÍA DE CAMBIOS POR USUARIO (Acceso EXCLUSIVO: Administrador)
+        /// <summary>
+        /// Muestra los cambios registrados en la auditoría.
+        /// </summary>
+        /// <param name="idUsuario">Usuario usado como filtro.</param>
+        /// <returns>La vista de auditoría.</returns>
         [VerificarAcceso(SoloAdministrador = true)]
         public async Task<IActionResult> Auditoria(int? idUsuario)
         {
