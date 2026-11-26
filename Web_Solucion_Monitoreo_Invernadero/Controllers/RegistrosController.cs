@@ -5,7 +5,15 @@ using Web_Solucion_Monitoreo_Invernadero.Database;
 using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
+
 {
+
+
+    /// Controlador encargado de la consulta y exportación de trazabilidad histórica del sistema.
+    /// Provee vistas filtradas y endpoints JSON en vivo para el historial ambiental (con exportación
+    /// a CSV para Excel) y la bitácora de riegos y alertas, además de restringir exclusivamente a
+    /// los administradores la consulta del registro forense de auditoría de cambios por usuario.
+
     [VerificarAcceso] // Protege TODAS las acciones de este controlador (exige sesión iniciada)
     public class RegistrosController : Controller
     {

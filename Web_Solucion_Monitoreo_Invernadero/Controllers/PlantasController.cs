@@ -8,6 +8,13 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+
+    /// Controlador CRUD para el catálogo botánico de especies de orquídeas.
+    /// Gestiona el alta, edición y borrado lógico de plantas con búsqueda y filtros de disponibilidad,
+    /// validando y normalizando los umbrales mínimos, óptimos y máximos de temperatura y humedad,
+    /// e impidiendo eliminar especies que estén asignadas a un invernadero activo.
+
     [VerificarAcceso]
     public class PlantasController : Controller
     {

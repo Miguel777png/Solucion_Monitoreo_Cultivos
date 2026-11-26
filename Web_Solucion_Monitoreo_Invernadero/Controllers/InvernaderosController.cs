@@ -7,6 +7,12 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+    /// Controlador maestro-detalle para la gestión de invernaderos y su configuración operativa.
+    /// Permite a operadores y administradores asignar especies disponibles (regla 1:1) y ajustar
+    /// la frecuencia de guardado histórico con trazabilidad Antes/Después. Además, restringe a los
+    /// administradores la creación de nuevos sectores y la vinculación de sensores de la lista blanca.
+
     [VerificarAcceso]
     public class InvernaderosController : Controller
     {

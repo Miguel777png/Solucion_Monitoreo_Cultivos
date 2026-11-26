@@ -5,6 +5,11 @@ using Web_Solucion_Monitoreo_Invernadero.Filters;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+    /// Controlador principal del panel de supervisión en tiempo real (Monitor en Vivo).
+    /// Carga los invernaderos activos junto con su especie y sensor vinculado, selecciona el sector
+    /// a visualizar y obtiene las últimas alertas y eventos de riego para inicializar la interfaz.
+
     [VerificarAcceso]
     public class MonitoreoController : Controller
     {

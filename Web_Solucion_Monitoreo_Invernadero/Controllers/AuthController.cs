@@ -8,6 +8,14 @@ using Web_Solucion_Monitoreo_Invernadero.Database;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+
+    /// 
+    /// Controlador encargado de la autenticación y gestión de sesiones de usuario.
+    /// Valida credenciales contra la base de datos, emite cookies de autenticación basadas en Claims
+    /// junto con variables de sesión HTTP, y gestiona el cierre de sesión y vistas de acceso denegado.
+    /// 
+
     public class AuthController : Controller
     {
         private readonly ApplicationDbContext _db;

@@ -7,6 +7,13 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+    /// API REST central de comunicación entre los nodos ESP32 y el panel web en tiempo real.
+    /// Recibe lecturas periódicas de humedad y temperatura, actualiza la caché en memoria RAM,
+    /// evalúa actuaciones de climatización (ventilación/calefacción) y riego de emergencia continuo,
+    /// despacha y confirma de forma idempotente órdenes de riego persistentes, persiste históricos y
+    /// alertas en MySQL, y alimenta los endpoints de monitoreo y notificaciones en vivo del frontend.
+
     [ApiController]
     [Route("api/[controller]")]
     public class TelemetriaController : ControllerBase

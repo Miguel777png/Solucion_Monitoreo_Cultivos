@@ -4,6 +4,13 @@ using Web_Solucion_Monitoreo_Invernadero.Models;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Services
 {
+
+
+    /// Servicio encargado de gestionar la trazabilidad y auditoría forense de acciones en el sistema.
+    /// Obtiene la identidad del usuario autenticado desde los Claims o la sesión HTTP y registra
+    /// en la base de datos cada operación administrativa u operativa junto con la entidad afectada,
+    /// el detalle del cambio y la marca de tiempo.
+
     public class AuditoriaService
     {
         private readonly ApplicationDbContext _db;

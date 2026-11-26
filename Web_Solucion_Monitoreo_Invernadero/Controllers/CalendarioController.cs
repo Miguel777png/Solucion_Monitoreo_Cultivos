@@ -7,6 +7,11 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+    /// Controlador para la administración de horarios de riego programado por invernadero.
+    /// Permite listar agendas activas con filtro por sector, programar riegos recurrentes por día
+    /// de la semana o en fechas específicas con duración definida, y desactivar horarios existentes,
+    /// registrando cada operación en la bitácora de auditoría.
+
     [VerificarAcceso]
     public class CalendarioController : Controller
     {

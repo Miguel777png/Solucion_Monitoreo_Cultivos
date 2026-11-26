@@ -7,6 +7,12 @@ using Web_Solucion_Monitoreo_Invernadero.Services;
 
 namespace Web_Solucion_Monitoreo_Invernadero.Controllers
 {
+
+    /// Controlador exclusivo para administradores que gestiona la lista blanca de nodos IoT (ESP32).
+    /// Permite registrar códigos de hardware únicos, vincular o desvincular dispositivos garantizando
+    /// la relación 1:1 con cada invernadero, y activar o desactivar nodos con registro en auditoría.
+    /// </summary>
+
     [VerificarAcceso(SoloAdministrador = true)]
     public class SensoresController : Controller
     {
